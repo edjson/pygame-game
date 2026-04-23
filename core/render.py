@@ -29,6 +29,7 @@ class renderer:
             pygame.draw.circle(self.screen, player_projectile_color, i.pos, i.radius)
         
         for i in game.enemy_projectiles:
+            #trajectory lines
             if settings.trace == True:
                 direction = i.velocity.normalize()
                 end = i.pos + direction * screen_width
