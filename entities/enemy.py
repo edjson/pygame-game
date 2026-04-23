@@ -19,11 +19,11 @@ _profile = None
 
 
 def init_agent(profile=None):
-    """Load model weights. Optionally seed with a saved profile."""
     global _agent, _profile
-    _profile = profile
-    _agent   = DQNagent()
-    weights_path = "ai/weights/weights.pt"
+    _profile     = profile
+    _agent       = DQNagent()
+    BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    weights_path = os.path.join(BASE_DIR, "ai", "weights", "weights.pt")
     if os.path.exists(weights_path):
         _agent.load(weights_path)
         print(f"[Enemy] DQN weights loaded from {weights_path}")
@@ -32,7 +32,7 @@ def init_agent(profile=None):
 
 
 def update_profile(profile: dict):
-    """Called by game loop after behavior_tracker computes a live profile."""
+    """Replace the module-level profile used for state-building and spawn scaling."""
     global _profile
     _profile = profile
 
@@ -51,7 +51,10 @@ moves = [
 
 
 class Enemy:
+    """A single enemy entity driven by the DQN agent, with a rule-based fallback."""
+
     def __init__(self, x, y, type_index):
+        """Spawn at (x, y) with stats from types[type_index], apply profile scaling, and register globally."""
         self.enemy_id        = next(_id_counter)
         unit                 = types[type_index]
         self.pos             = pygame.Vector2(x, y)
@@ -73,10 +76,11 @@ class Enemy:
         enemies.append(self)
 
     def can_fire(self):
+        """Return True if the fire cooldown has elapsed."""
         return self.fire_cooldown <= 0
 
     def _apply_profile_scaling(self):
-        """Scale stats from live profile multipliers if available."""
+        """Scale speed, damage, and fire rate from live profile multipliers if available."""
         if _profile is None:
             return
         self.speed     *= _profile.get("speed_multiplier",    1.0)
@@ -84,7 +88,7 @@ class Enemy:
         self.fire_rate *= (1.0 / max(_profile.get("fire_rate_multiplier", 1.0), 0.1))
 
     def update(self, dt, player, player_projectiles=None, enemy_projectiles=None):
-        """Update every frame using DQN agent."""
+        """Tick movement and firing via DQN action, falling back to rule_based_update if no agent exists."""
         global _agent, _profile
         if enemy_projectiles is None:
             enemy_projectiles = []
@@ -139,7 +143,7 @@ class Enemy:
                 )
 
     def rule_based_update(self, dt, target_pos, enemy_projectiles=None):
-        """Fallback: enemies only chase and shoot player."""
+        """Chase and shoot the player directly, with no learned behaviour."""
         enemy_projectiles = enemy_projectiles or []
         direction = pygame.Vector2(target_pos) - self.pos
         if direction.length() > 0:
@@ -162,12 +166,12 @@ class Enemy:
                 ))
 
     def take_damage(self, damage):
-        """Apply damage, return True if killed."""
+        """Subtract damage from health and return True if the enemy is now dead."""
         self.health -= damage
         return self.health <= 0
 
     def draw(self, screen):
-        """Draw enemy and health bar."""
+        """Draw the enemy circle and a health bar above it."""
         pygame.draw.circle(screen, self.color, self.pos, self.radius)
         bar_x    = self.pos.x - bar_w // 2
         bar_y    = self.pos.y - self.radius - 10
@@ -177,7 +181,7 @@ class Enemy:
 
 
 def spawn_enemies(count):
-    """Spawn enemies at random screen edges."""
+    """Spawn count enemies of random type at random screen edges."""
     m = margin
     for _ in range(count):
         side       = random.choice(["top", "bottom", "left", "right"])
@@ -194,7 +198,7 @@ def spawn_enemies(count):
 
 
 def spawn_tutorial_unit():
-    """Spawn the tutorial enemy."""
+    """Spawn the fixed tutorial enemy (type 6) at a random edge position."""
     m    = margin
     side = random.choice(["top", "bottom", "left", "right"])
     if side == "top":

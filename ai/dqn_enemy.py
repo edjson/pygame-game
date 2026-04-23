@@ -14,11 +14,11 @@ total_actions = 9
 layers        = 512
 gamma         = 0.9
 learning_rate = 0.001
-batch_size    = 512        # was 2048 — smaller batches prevent early overfitting
+batch_size    = 512      
 target_sync   = 500
 explore_start = 1.0
-explore_end   = 0.15       # was 0.05 — keep more randomness late in training
-explore_decay = 0.9995     # was 0.999 — slower decay, more exploration time
+explore_end   = 0.15     
+explore_decay = 0.9995  
 
 diagonal = math.hypot(screen_width, screen_height)
 
@@ -36,7 +36,10 @@ movement = [
 
 
 class DQNagent:
+    """LSTM-DQN agent with per-enemy hidden state, epsilon-greedy exploration, and periodic target sync."""
+
     def __init__(self, device: str | None = None):
+        """Initialise online/target networks, optimizer, replay buffer, and epsilon schedule."""
         self.device    = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.online    = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
         self.target    = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
@@ -49,12 +52,14 @@ class DQNagent:
         self.hidden    = {}
 
     def reset_hidden(self, enemy_id=None):
+        """Clear the LSTM hidden state for one enemy, or all enemies if no id is given."""
         if enemy_id is None:
             self.hidden = {}
         else:
             self.hidden.pop(enemy_id, None)
 
     def select_action(self, state, enemy_id):
+        """Return (action, lead) via epsilon-greedy policy, carrying LSTM state across calls for the same enemy."""
         if random.random() < self.epsilon:
             return random.randrange(total_actions), 0.5
         with torch.no_grad():
@@ -67,6 +72,7 @@ class DQNagent:
             return action, lead_scale
 
     def action_to_direction(self, action):
+        """Convert a discrete action index to a unit (dx, dy) direction vector."""
         dx, dy = movement[action]
         length = math.hypot(dx, dy)
         if length > 0:
@@ -74,12 +80,14 @@ class DQNagent:
         return 0.0, 0.0
 
     def push(self, state, action, reward, next_state, done):
+        """Store a transition, increment step counter, and sync target network every target_sync steps."""
         self.buffer.push(state, action, reward, next_state, done)
         self.steps += 1
         if self.steps % target_sync == 0:
             self.target.load_state_dict(self.online.state_dict())
 
     def learn(self):
+        """Sample a minibatch and perform one MSE-loss DQN update; returns loss or None if buffer is too small."""
         if len(self.buffer) < batch_size:
             return None
 
@@ -105,9 +113,11 @@ class DQNagent:
         return loss.item()
 
     def decay_epsilon(self):
+        """Multiply epsilon by explore_decay, floored at explore_end."""
         self.epsilon = max(explore_end, self.epsilon * explore_decay)
 
     def save(self, path: str = "ai/weights/weights.pt"):
+        """Checkpoint online/target weights, epsilon, and step count to disk."""
         torch.save({
             "online":  self.online.state_dict(),
             "target":  self.target.state_dict(),
@@ -116,6 +126,7 @@ class DQNagent:
         }, path)
 
     def load(self, path: str = "ai/weights/weights.pt"):
+        """Restore network weights, epsilon, and step count from a checkpoint file."""
         ck = torch.load(path, map_location=self.device, weights_only=True)
         self.online.load_state_dict(ck["online"])
         self.target.load_state_dict(ck["target"])
@@ -124,6 +135,7 @@ class DQNagent:
 
 
 def build_state(enemy, player, projectile, allies, profile=None):
+    """Build a normalised 30-d state vector from enemy/player/projectile/ally positions and an optional behaviour profile."""
     ex = enemy.pos.x
     ey = enemy.pos.y
     px = player.pos.x
@@ -182,6 +194,7 @@ def build_state(enemy, player, projectile, allies, profile=None):
 
 def compute_rewards(enemy, player, allies, prev_player_health, curr_player_health,
                     hit_by_projectile, died, profile=None):
+    """Compute a scalar reward from damage dealt, survival, spread, clustering, wall proximity, and strategy."""
     reward = 0.0
     damage = prev_player_health - curr_player_health
     reward += damage * 1.0

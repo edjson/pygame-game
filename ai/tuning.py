@@ -22,7 +22,10 @@ ft_weights    = "ai/weights/weights_finetuned.pt"
 
 
 class FineTuneAgent:
+    """DQN agent that fine-tunes from a frozen base policy with a KL penalty to limit behavioural drift."""
+
     def __init__(self, device: str | None = None):
+        """Initialise base, online, and target networks, then load any existing weights."""
         self.device  = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.base    = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
         self.online  = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
@@ -34,10 +37,11 @@ class FineTuneAgent:
         self.buffer    = ReplayBuffer(capacity=200_000)
         self.epsilon   = epsilon
         self.steps     = 0
-        self.hidden    = {}   # per-enemy LSTM hidden state (matches DQNagent pattern)
+        self.hidden    = {}  
         self.load()
 
     def load(self):
+        """Seed all three networks from base_weights, then overlay fine-tuned weights if available."""
         if os.path.exists(base_weights):
             ck = torch.load(base_weights, map_location=self.device, weights_only=True)
             self.base.load_state_dict(ck["online"])
@@ -53,6 +57,7 @@ class FineTuneAgent:
         self.target.eval()
 
     def select_action(self, state, enemy_id=None):
+        """Return (action, lead) via epsilon-greedy, persisting LSTM state per enemy_id."""
         if random.random() < self.epsilon:
             return random.randrange(total_actions), 0.5
         with torch.no_grad():
@@ -64,12 +69,14 @@ class FineTuneAgent:
             return int(q.argmax(dim=1).item()), float(lead.item())
 
     def push(self, state, action, reward, next_state, done):
+        """Store a transition and sync the target network every sync steps."""
         self.buffer.push(state, action, reward, next_state, done)
         self.steps += 1
         if self.steps % sync == 0:
             self.target.load_state_dict(self.online.state_dict())
 
     def learn(self):
+        """Compute DQN loss plus KL divergence from the base policy, then update online network."""
         if len(self.buffer) < batch_size:
             return None
 
@@ -109,6 +116,7 @@ class FineTuneAgent:
         return loss.item()
 
     def save(self):
+        """Checkpoint online and target weights plus step count to ft_weights."""
         torch.save({
             "online": self.online.state_dict(),
             "target": self.target.state_dict(),

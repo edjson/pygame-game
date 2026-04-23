@@ -61,3 +61,5 @@ projectile_speeds        = 500
 record                   = 0
 volume                   = 50
 color_options            = ["red", "orange", "yellow", "green", "blue", "indigo", "violet"]
+adapt_from_stage         = 3
+trace                    = False

@@ -8,12 +8,11 @@ from entities.enemy import enemies, spawn_enemies, init_agent, update_profile
 from core.behavior_tracker import compute_live_profile
 from settings import (enemies_count_rate, spawn_decay_rate, min_spawn_delay, current_spawn_delay,
                       player_projectile_radius, player_damage, player_projectile_color,
-                      screen_width, screen_height, cx, cy)
-
-ADAPT_FROM_STAGE = 3
+                      adapt_from_stage, cx, cy)
 
 
 def get_all_profiles():
+    """Return a sorted list of profile names that have a profile.json in the replays directory."""
     BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     replays_dir = os.path.join(BASE_DIR, "replays")
     if not os.path.exists(replays_dir):
@@ -27,6 +26,7 @@ def get_all_profiles():
 
 
 def get_replay_paths(profile_name):
+    """Return sorted paths to all run JSON files for a given profile."""
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     folder   = os.path.join(BASE_DIR, "replays", profile_name)
     if not os.path.exists(folder):
@@ -39,10 +39,12 @@ def get_replay_paths(profile_name):
 
 
 class Simulation:
+    """Headless AI-vs-AI simulation that cycles through profiles and replays, logging stage results."""
     current_stage = 1
     spawn_total   = 1
 
     def __init__(self, profile_name=None):
+        """Discover all profiles, select the first, and run an initial reset."""
         all_profiles = get_all_profiles()
         if profile_name and profile_name not in all_profiles:
             all_profiles.insert(0, profile_name)
@@ -58,12 +60,13 @@ class Simulation:
         self.reset()
 
     def current_replay_label(self):
+        """Return the filename of the current replay, or 'no replays' if none exist."""
         if not self.replay_paths:
             return "no replays"
         return os.path.basename(self.replay_paths[self.replay_index % len(self.replay_paths)])
 
     def reset(self):
-        # Save result from previous run
+        """Save the previous run's result, rotate profile if all replays are exhausted, and reinitialise."""
         if hasattr(self, "elapsed") and self.elapsed > 0:
             label = self.current_replay_label()
             self.run_results.append((label, self.current_stage))
@@ -78,7 +81,6 @@ class Simulation:
                 self.run_results   = []
                 print(f"[Simulation] Switching to profile: {self.profile_name} ({len(self.replay_paths)} replays)")
 
-        # Fresh agent each reset
         init_agent(profile=None)
 
         self.current_stage       = 1
@@ -108,6 +110,7 @@ class Simulation:
             print(f"[Simulation] Starting run {self.replay_index + 1}/{len(self.replay_paths)}: {self.current_replay_label()}")
 
     def _print_summary(self):
+        """Print a per-run stage table and avg/best stats for the completed profile cycle."""
         if not self.run_results:
             return
         print("\n========================================")
@@ -122,6 +125,7 @@ class Simulation:
         print("========================================\n")
 
     def _ai_fire(self, origin, target):
+        """Spawn a player projectile from origin toward target."""
         direction = pygame.Vector2(target) - pygame.Vector2(origin)
         if direction.length() > 0:
             direction = direction.normalize()
@@ -131,22 +135,20 @@ class Simulation:
             ))
 
     def _maybe_adapt(self):
-        """Compute and push live profile after ADAPT_FROM_STAGE."""
-        if self.current_stage <= ADAPT_FROM_STAGE or not self.behavior_log:
+        """Compute and push a live profile to enemies and update the AI player's fire rate."""
+        if self.current_stage <= adapt_from_stage or not self.behavior_log:
             return
         profile = compute_live_profile(self.behavior_log, self.current_stage)
         if profile:
             self.live_profile = profile
             update_profile(profile)
-
-            # Update AIPlayer fire rate based on live profile
             adapted = profile.get("fire_rate")
             if adapted is not None:
                 self.player.fire_rate = adapted
                 print(f"[Simulation] AIPlayer fire_rate adapted to {adapted}")
 
     def _capture_frame(self):
-        """Lightweight frame capture for behavior_tracker."""
+        """Snapshot lightweight per-frame stats for the behavior tracker."""
         alive     = [e for e in self.enemies if e.health > 0]
         distances = [e.pos.distance_to(self.player.pos) for e in alive]
         nearest   = alive[distances.index(min(distances))] if distances else None
@@ -179,6 +181,7 @@ class Simulation:
         }
 
     def update(self, dt):
+        """Advance the game by dt; handles input, projectiles, enemy AI, stage progression, and logging. Returns 'game_over', 'level', or None."""
         if self.player.health <= 0:
             self.reset()
             return

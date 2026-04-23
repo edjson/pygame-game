@@ -73,7 +73,7 @@ def music_unpause():
         print(f"[audio] unpause failed: {e}")
 
 def music_stop():
-    """Stop and unload music."""
+    """Stops music."""
     try:
         pygame.mixer.music.stop()
     except pygame.error as e:
@@ -87,9 +87,8 @@ def music_restart():
     except pygame.error as e:
         print(f"[audio] restart failed: {e}")
 
-# profile retrive 
 def get_profile_name(screen, clock):
-    """Creates a profile"""
+    """Render a name-entry screen and return the typed string when the player presses Enter."""
     name = ""
     while True:
         for event in pygame.event.get():
@@ -118,7 +117,7 @@ def get_profile_name(screen, clock):
 
 
 def load_profile(profile_name):
-    """Loads profile_name"""
+    """Return the profile dict from replays/<profile_name>/profile.json, or None if not found."""
     path = os.path.join("replays", profile_name, "profile.json")
     if os.path.exists(path):
         with open(path) as f:
@@ -132,12 +131,6 @@ pygame.display.set_caption(title)
 clock   = pygame.time.Clock()
 assets  = load_assets(screen_width, screen_height)
 manager = pygame_gui.UIManager((screen_width, screen_height))
-
-
-# create profile option function call
-#settings.profile_name = get_profile_name(screen, clock)
-#profile = load_profile(settings.profile_name)
-
 tutorial   = None
 simulation = None
 render     = renderer(screen)
@@ -157,14 +150,14 @@ dt          = 0
 back_state  = None
 paused_from = None
 last_mode   = "playing"
-
+game = None
 # Transisiton handler
 while state != "quit":
 
     if state == "tutorial" or (state == "level" and last_mode == "tutorial"):
         new_state = handler.process(state, menus, tutorial.player.pos, tutorial.player, paused_from, tutorial=tutorial)
     else:
-        current_player = game.player if "game" in dir() else None 
+        current_player = getattr(game, "player", None)
         new_state = handler.process(state, menus, None, current_player, paused_from)
 
     if new_state == "quit":

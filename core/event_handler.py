@@ -13,7 +13,10 @@ def get_cooldown(fire_rate: float) -> int | None:
 
 
 class EventHandler:
+    """Processes pygame events, routes them by game state, and fires player projectiles on mouse hold."""
+
     def __init__(self, manager, fire_rate: float = None):
+        """Initialise with a pygame_gui manager and an optional override fire rate."""
         import settings
         self.manager        = manager
         self.mouse_held     = False
@@ -29,6 +32,10 @@ class EventHandler:
 
     def process(self, state: str, menus: dict, player_pos, player,
                 paused_from=None, tutorial=None):
+        """
+        Drain the pygame event queue for the current state and return the next state string.
+        Also triggers player.launch() while the mouse is held and the cooldown has elapsed.
+        """
         current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():

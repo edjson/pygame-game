@@ -4,7 +4,10 @@ import settings
 from entities.projections import Projectile
 
 class Player:
+    """Human-controlled player with WASD movement, health, XP, and callback-based firing."""
+
     def __init__(self):
+        """Initialise position, stats, and XP progression from settings defaults."""
         self.pos           = pygame.Vector2(cx, cy)
         self.vel           = pygame.Vector2(0,0)
         self.radius        = player_radius
@@ -20,7 +23,7 @@ class Player:
         self.fire_callback = None
 
     def input(self, dt):
-        """takes wasd movement, and escape to pause"""
+        """Initialise position, stats, and XP progression from settings defaults."""
         keys = pygame.key.get_pressed()
         self.vel = pygame.Vector2(0, 0)
 
@@ -38,14 +41,14 @@ class Player:
         self.pos.y = max(self.radius, min(screen_height - self.radius, self.pos.y))
 
     def update(self, dt):
-        """per frame update — firing is handled by EventHandler, not here"""
+        """Advance position each frame; firing is handled by EventHandler."""
         self.input(dt)
         self.pos += self.vel * dt
         self.pos.x = max(self.radius, min(screen_width - self.radius, self.pos.x))
         self.pos.y = max(self.radius, min(screen_height - self.radius, self.pos.y))
 
     def draw_health_bar(self, screen):
-        """creates hp bar"""
+        """Draw a small health bar centred above the player circle."""
         bar_w = 50
         bar_h = 6
         x     = int(self.pos.x) - bar_w // 2
@@ -55,11 +58,11 @@ class Player:
         pygame.draw.rect(screen, color_health_bar, (x, y, int(bar_w * ratio), bar_h))
 
     def take_damage(self, amount):
-        """applies damage"""
+        """Subtract amount from current health."""
         self.health -= amount
 
     def draw(self, screen):
-        """displays player and hp bar"""
+        """Register the function invoked when the player fires; signature: callback(from_pos, cursor_pos)."""
         pygame.draw.circle(screen, settings.player_color, (int(self.pos.x), int(self.pos.y)), self.radius)
         self.draw_health_bar(screen)
 
@@ -67,6 +70,6 @@ class Player:
         self.fire_callback = callback
 
     def launch(self, cursor_pos):
-        """fires a projectile toward cursor via fire callback"""
+        """Fire a projectile toward cursor_pos via the registered fire callback."""
         if self.fire_callback:
             self.fire_callback(self.pos, cursor_pos)

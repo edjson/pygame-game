@@ -1,5 +1,5 @@
 import pygame
-from settings import (background, screen_height, screen_width, font_big, 
+from settings import (background, screen_width, color_options,
                       font_small, input_color, color_health_bg, 
                       color_health_bar, text_color, player_projectile_color,
                       enemy_projectile_color
@@ -8,12 +8,18 @@ from game_environments.game import Game
 from game_environments.tutorial import Tutorial
 from game_environments.simulationenv import Simulation
 from entities.enemy import enemies
+import settings
+import random
 
 class renderer:
+    """Handles all screen drawing: world entities, HUD health bar, stage info, and player stats."""
+
     def __init__(self, screen):
+        """Store the pygame surface to draw onto."""
         self.screen = screen
 
     def draw_game(self, player, game):
+        """Draw health bar, stage label, level, kill count, projectiles, trace and stat readouts."""
         self.screen.fill(background)
         player.draw(self.screen)
         for i in game.enemies:
@@ -23,6 +29,10 @@ class renderer:
             pygame.draw.circle(self.screen, player_projectile_color, i.pos, i.radius)
         
         for i in game.enemy_projectiles:
+            if settings.trace == True:
+                direction = i.velocity.normalize()
+                end = i.pos + direction * screen_width
+                pygame.draw.line(self.screen, random.choice(color_options), (int(i.pos.x), int(i.pos.y)), (int(end.x), int(end.y)), 1)
             pygame.draw.circle(self.screen, enemy_projectile_color, (int(i.pos.x), int(i.pos.y)), i.radius)
 
         bar_w = 250

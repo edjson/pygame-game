@@ -3,7 +3,7 @@ import settings
 from entities.player import Player
 from entities.projections import Projectile
 from settings import (screen_width, screen_height, cx, cy, warning_radius, enemies_count_rate,
-                      player_projectile_radius, player_damage, player_projectile_color)
+                      player_projectile_radius, player_damage, player_projectile_color, adapt_from_stage)
 from entities.enemy import enemies, spawn_enemies, init_agent, update_profile
 from ai.llm import synthesis
 from core.behavior_tracker import compute_live_profile
@@ -13,19 +13,22 @@ import time
 import threading
 from entities.enemy_list import types
 
-ADAPT_FROM_STAGE = 3  # live adaptation kicks in after this stage
 
 
 class Game:
+    """Core game loop: manages player, enemies, projectiles, behavior logging, and stage progression."""
+
     current_stage = 1
 
     def __init__(self, profile_name=None):
+        """Initialise the agent with no profile, then reset all game state."""
         self.profile_name = profile_name
-        init_agent(profile=None)  # always fresh, no pre-adaptation from saved profile
+        init_agent(profile=None) 
         self.reset()
         self.train_thread = None
 
     def reset(self):
+        """Clear all entities and counters, ready for a fresh run."""
         if self.current_stage > settings.record:
             settings.record = self.current_stage
 
@@ -58,9 +61,10 @@ class Game:
         self.evasions_failed      = 0
         self.stage_kills          = 0
         self.stage_total          = 1
-        self.live_profile         = None   # populated after stage ADAPT_FROM_STAGE
+        self.live_profile         = None  
 
     def _fire(self, origin, target):
+        """Spawn a player projectile from origin toward target."""
         direction = pygame.Vector2(target) - pygame.Vector2(origin)
         if direction.length() > 0:
             direction = direction.normalize()
@@ -69,24 +73,22 @@ class Game:
                 player_projectile_radius, player_damage, player_projectile_color
             ))
 
-    # ------------------------------------------------------------------ #
-    #  Live adaptation                                                      #
-    # ------------------------------------------------------------------ #
+
+    # Live adaptation
     def _maybe_adapt(self):
-        """Compute and push a live profile after ADAPT_FROM_STAGE stages."""
-        if self.current_stage <= ADAPT_FROM_STAGE:
+        """Compute and push a live profile to enemies once adapt_from_stage has been reached."""
+        if self.current_stage <= adapt_from_stage:
             return
         if not self.behavior_log:
             return
         profile = compute_live_profile(self.behavior_log, self.current_stage)
         if profile:
             self.live_profile = profile
-            update_profile(profile)   # enemies read this immediately
+            update_profile(profile)  
 
-    # ------------------------------------------------------------------ #
-    #  Frame capture                                                        #
-    # ------------------------------------------------------------------ #
+    # Frame capture
     def capture_frame(self):
+        """Snapshot the current game state into a dict for the behavior log."""
         cursor        = pygame.mouse.get_pos()
         alive_enemies = [e for e in self.enemies if e.health > 0]
         distances     = [e.pos.distance_to(self.player.pos) for e in alive_enemies]
@@ -156,10 +158,9 @@ class Game:
             "evasion_rate":        round(self.evasions_successful / max(self.evasions_attempted, 1), 2),
         }
 
-    # ------------------------------------------------------------------ #
-    #  Save + LLM synthesis (runs after game-over in background thread)    #
-    # ------------------------------------------------------------------ #
+    # Save + LLM synthesis (runs after game-over in background thread)
     def save_log(self):
+        """Write the behavior log to disk and kick off LLM synthesis in a background thread."""
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path     = os.path.join(BASE_DIR, "replays", self.profile_name)
         os.makedirs(path, exist_ok=True)
@@ -173,16 +174,17 @@ class Game:
         return filepath
 
     def _run_synthesis(self, log_path):
+        """Run LLM profile synthesis in a background thread, printing any traceback on failure."""
         try:
             synthesis(log_path, self.profile_name)
         except Exception:
             import traceback
             traceback.print_exc()
 
-    # ------------------------------------------------------------------ #
-    #  Evasion tracking                                                     #
-    # ------------------------------------------------------------------ #
+
+    # Evasion tracking
     def _update_evasion(self):
+        """Track enemy projectiles entering warning range and record hits or successful dodges."""
         current_ids = {id(ep) for ep in self.enemy_projectiles}
         for ep in self.enemy_projectiles:
             eid  = id(ep)
@@ -198,16 +200,16 @@ class Game:
                 self.evasions_successful += 1
 
     def _mark_evasion_hit(self):
+        """Flag the first tracked projectile as having hit the player."""
         for ep in self.enemy_projectiles:
             eid = id(ep)
             if eid in self._tracked_projectiles:
                 self._tracked_projectiles[eid]["hit"] = True
                 break
 
-    # ------------------------------------------------------------------ #
-    #  Main update                                                          #
-    # ------------------------------------------------------------------ #
+    # Main update
     def update(self, dt):
+        """Advance the game by dt; handles input, projectiles, enemy AI, stage progression, and logging. Returns 'game_over', 'level', or None."""
         if self.player.health <= 0:
             return "game_over"
 

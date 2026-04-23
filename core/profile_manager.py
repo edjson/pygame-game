@@ -1,9 +1,3 @@
-"""
-core/profile_manager.py
-
-Auto-assigns abstract profile names (Profile_1, Profile_2 ...) at game start.
-No name input required from the player.
-"""
 import os
 import json
 import settings
@@ -13,9 +7,7 @@ REPLAYS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 def assign_profile() -> str:
     """
-    Scans replays/ for existing Profile_N folders and returns the next
-    available name. Sets settings.profile_name automatically.
-    """
+    Scans replays/ for existing Profile_N folders and returns the next available name. Sets settings.profile_name automatically."""
     os.makedirs(REPLAYS_DIR, exist_ok=True)
     existing = []
     for name in os.listdir(REPLAYS_DIR):
@@ -44,10 +36,7 @@ def load_saved_profile(profile_name: str) -> dict | None:
 
 
 def init_profile() -> tuple[str, dict | None]:
-    """
-    Call once at the input_menu → main transition.
-    Returns (profile_name, saved_profile_or_None).
-    """
+    """Call once at the input_menu → main transition. Returns (profile_name, saved_profile_or_None)."""
     profile_name   = assign_profile()
     saved_profile  = load_saved_profile(profile_name)
     return profile_name, saved_profile

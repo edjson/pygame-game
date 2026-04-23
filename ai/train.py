@@ -19,19 +19,19 @@ import random
 import numpy as np
 from tqdm import tqdm
 import torch
+import argparse
 import multiprocessing as mp
 from ai.dqn_enemy import DQNagent
 from entities.enemy_list import build_types, types
-
-os.environ["SDL_VIDEODRIVER"] = "dummy"
-os.environ["SDL_AUDIODRIVER"] = "dummy"
-
+from ai.sim import Simulation
 import pygame
 pygame.init()
 pygame.mixer.quit()
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 
-# ── config ────────────────────────────────────────────────────────────────────
+# config
 n_episodes    = 1000
 n_envs        = 128
 n_workers     = max(1, mp.cpu_count() - 1)
@@ -46,25 +46,23 @@ sim_dt        = 1 / 20.0
 enemy_weights = "ai/weights/weights.pt"
 replays_dir   = "replays"
 
-# ── CLI args ──────────────────────────────────────────────────────────────────
-for i, arg in enumerate(sys.argv):
-    if arg == "--episodes" and i + 1 < len(sys.argv):
-        n_episodes = int(sys.argv[i + 1])
-    if arg == "--envs" and i + 1 < len(sys.argv):
-        n_envs = int(sys.argv[i + 1])
-    if arg == "--workers" and i + 1 < len(sys.argv):
-        n_workers = int(sys.argv[i + 1])
-    if arg == "--save-every" and i + 1 < len(sys.argv):
-        save_every = int(sys.argv[i + 1])
-    if arg == "--mode" and i + 1 < len(sys.argv):
-        mode = sys.argv[i + 1].lower()
-        if mode not in ("single", "multi"):
-            print(f"[error] --mode must be 'single' or 'multi', got '{mode}'")
-            sys.exit(1)
+# CLI args
+parser = argparse.ArgumentParser()
+parser.add_argument("--episodes",   type=int, default=1000)
+parser.add_argument("--envs",       type=int, default=128)
+parser.add_argument("--workers",    type=int, default=n_workers)
+parser.add_argument("--save-every", type=int, default=100)
+parser.add_argument("--mode",       choices=["single", "multi"], default="single")
+args        = parser.parse_args()
+n_episodes  = args.episodes
+n_envs      = args.envs
+n_workers   = args.workers
+save_every  = args.save_every
+mode        = args.mode
 
-
-# ── shared helpers ────────────────────────────────────────────────────────────
+# shared helpers 
 def discover_profiles():
+    """Scan the replays directory and return a list of (name, data) tuples for every valid profile.json."""
     profiles = []
     if not os.path.isdir(replays_dir):
         return profiles
@@ -81,7 +79,7 @@ def discover_profiles():
 
 
 def make_env(profile_name=None):
-    from ai.sim import Simulation
+    """Instantiate and return a Simulation configured with the global n_enemies and max_steps."""
     return Simulation(n_enemies=n_enemies, max_steps=max_steps, profile_name=profile_name)
 
 
@@ -89,9 +87,11 @@ def make_env(profile_name=None):
 # SINGLE-PROCESS TRAINING
 # ══════════════════════════════════════════════════════════════════════════════
 def train_single(enemy_agent, profiles):
+    """Run the full training loop in-process across n_envs parallel simulations."""
     print(f"[mode] single-process | {n_envs} envs | save every {save_every} eps")
 
     def pick_profile():
+        """Return a random (name, data) profile tuple, or (None, None) if none exist."""
         return random.choice(profiles) if profiles else (None, None)
 
     env_profiles   = [pick_profile() for _ in range(n_envs)]
@@ -184,19 +184,12 @@ def train_single(enemy_agent, profiles):
 # MULTIPROCESSING WORKER
 # ══════════════════════════════════════════════════════════════════════════════
 def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_steps, sim_dt, n_enemies):
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
-    os.environ["SDL_AUDIODRIVER"] = "dummy"
-
-    import pygame
-    pygame.init()
-    pygame.mixer.quit()
-
-    from entities.enemy_list import build_types
     build_types()
 
     from ai.sim import Simulation
 
     def pick_profile():
+        """Return a random profile tuple, or (None, None) if the list is empty."""
         return random.choice(profiles) if profiles else (None, None)
 
     n       = len(env_ids)
@@ -262,6 +255,7 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
 # MULTIPROCESSING TRAINING
 # ══════════════════════════════════════════════════════════════════════════════
 def train_multi(enemy_agent, profiles):
+    """Distribute environments across n_workers subprocesses, collect experiences, and train the agent."""
     print(f"[mode] multiprocessing | {n_workers} workers | {n_envs} total envs | save every {save_every} eps")
 
     envs_per_worker = n_envs // n_workers
@@ -383,6 +377,7 @@ def train_multi(enemy_agent, profiles):
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 def train():
+    """Load enemy types and weights, then dispatch to single or multi-process training based on --mode."""
     build_types()
     print(f"[types] {len(types)} enemy types loaded")
 

@@ -3,16 +3,21 @@ import pygame_gui
 from settings import cx, cy, button_height, button_width, cbutton_height, cbutton_width, font_big, text_color, thirds, background
 import settings
 
+
 class InputMenu:
+    """Colour-picker screen shown on first launch so the player can choose their player colour."""
+
     def __init__(self, manager):
+        """Create the colour buttons and hide them until the menu is shown."""
         self.manager = manager
-        self.gap = 220
+        self.gap     = 220
         self.visible = False
         self.buttons = {}
         self.color_buttons()
         self.hide()
 
     def color_buttons(self):
+        """Lay out one button per colour in a two-row grid centred on screen."""
         gap = self.gap
         color_layout = [
             ("red",    cx - gap - cbutton_width, cy - cbutton_height),
@@ -31,6 +36,7 @@ class InputMenu:
             )
 
     def handle_event(self, event, player):
+        """Apply the chosen colour to settings and return 'main', or 'input_menu' while waiting."""
         if not self.visible:
             return "input_menu"
         if event.type == pygame_gui.UI_BUTTON_PRESSED:
@@ -42,17 +48,20 @@ class InputMenu:
         return "input_menu"
 
     def draw(self, screen, manager):
+        """Draw the background, title, and colour buttons."""
         screen.fill(background)
         label = font_big.render("Choose Your Color", True, text_color)
         screen.blit(label, label.get_rect(center=(cx, thirds)))
         manager.draw_ui(screen)
 
     def hide(self):
+        """Hide all colour buttons and mark the menu inactive."""
         self.visible = False
         for btn in self.buttons.values():
             btn.hide()
 
     def show(self):
+        """Show all colour buttons and mark the menu active."""
         self.visible = True
         for btn in self.buttons.values():
             btn.show()

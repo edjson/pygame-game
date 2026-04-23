@@ -8,7 +8,7 @@ from settings import screen_height, screen_width, cy, cx, detection_radius, marg
 import settings
 
 def apply_buff(player, buff_name):
-    """Apply buffs to ai player."""
+    """Apply a named stat upgrade to the player in-place."""
     if buff_name == "Speed":
         player.speed += 5
     elif buff_name == "Max Health":
@@ -24,7 +24,7 @@ all_buffs = ["Speed", "Max Health", "Health Regen", "Damage", "Heal"]
 
 
 def load_profile(profile_name):
-    """Load profile."""
+    """Load and return a player profile dict from replays/<profile_name>/profile.json, or None if missing."""
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(BASE_DIR, "replays", profile_name, "profile.json")
     if not os.path.exists(path):
@@ -35,7 +35,7 @@ def load_profile(profile_name):
 
 
 def build_weights(profile):
-    """Build weights from buff priority list."""
+    """Return a buff-name → weight dict derived from the profile's level_up_priority order."""
     if not profile:
         return {b: 1 for b in all_buffs}
     priority = profile.get("level_up_priority", all_buffs)
@@ -47,13 +47,16 @@ def build_weights(profile):
 
 
 class AIPlayer(Player):
+    """Profile-driven AI player with dodge, targeting, firing, and weighted level-up logic."""
+
     def __init__(self, profile_name=None):
+        """Load profile, derive behaviour parameters, and print a diagnostic summary."""
         super().__init__()
 
         self.fire_callback    = None
         self._fire_timer      = 0.0
         self.priority_type    = None
-        self._enemy_proj_list = []   # injected by SimPlayer before each update
+        self._enemy_proj_list = []   
 
         profile = load_profile(profile_name) if profile_name else None
         self.profile = profile
@@ -71,7 +74,7 @@ class AIPlayer(Player):
         print(f"[AIPlayer] Mobility:      {self.mobility}")
 
     def apply_profile(self, profile):
-        """Apply profile stats, or defaults if missing."""
+        """Translate a profile dict into behaviour attributes, falling back to safe defaults when absent."""
         if not profile:
             self.last_vel             = pygame.Vector2(0, 0)
             self.preferred_range      = 200
@@ -120,10 +123,11 @@ class AIPlayer(Player):
         self.priority_type             = max(engagement, key=engagement.get) if engagement else None
 
     def set_fire_callback(self, callback):
+        """Register the function called when the AI fires; signature: callback(from_pos, to_pos)."""
         self.fire_callback = callback
 
     def pick_upgrade(self):
-        """Use weights to pick and apply a buff."""
+        """Weighted-randomly select, apply, and return an upgrade name."""
         buffs   = list(self.upgrade_weights.keys())
         weights = [self.upgrade_weights[b] for b in buffs]
         chosen  = random.choices(buffs, weights=weights, k=1)[0]
@@ -131,7 +135,7 @@ class AIPlayer(Player):
         return chosen
 
     def select_target(self, dt):
-        """Select target based on strategy (rush, flank, surround)."""
+        """Return the highest-priority live enemy according to the current target_mode strategy."""
         alive = [e for e in enemies if e.health > 0]
         if not alive:
             return None
@@ -165,7 +169,7 @@ class AIPlayer(Player):
         return min(alive, key=lambda e: self.pos.distance_to(e.pos))
 
     def dodge_projectiles(self):
-        """Compute dodge vector from incoming projectiles."""
+        """Return a unit dodge vector that steers away from incoming projectiles and screen edges."""
         dodge = pygame.Vector2(0, 0)
 
         ep_list = self._enemy_proj_list if self._enemy_proj_list else []
@@ -230,7 +234,7 @@ class AIPlayer(Player):
         return dodge
 
     def input(self, dt):
-        """Orchestrate AI player behavior."""
+        """Tick the AI: select target, compute dodge/movement velocity, and fire with aim noise."""
         self.last_vel    = self.vel
         self.vel         = pygame.Vector2(0, 0)
         self._fire_timer = max(0.0, self._fire_timer - dt)

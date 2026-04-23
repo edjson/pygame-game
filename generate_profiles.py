@@ -1,3 +1,9 @@
+"""
+seed_profiles.py
+Writes a set of hand-crafted player profiles to replays/<name>/profile.json.
+Run once to populate the replays directory with archetypes for simulation and testing.
+"""
+
 import json
 import os
 
@@ -286,10 +292,8 @@ for p in profiles:
     save_dir = os.path.join(base_dir, "replays", p["name"])
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, "profile.json")
-    # remove name key before saving — profile.json only stores the profile data
-    profile_data = {k: v for k, v in p["profile"].items()}
     with open(save_path, "w") as f:
-        json.dump(profile_data, f, indent=2)
+        json.dump(p["profile"], f, indent=2)
     print(f"Saved: {save_path}")
 
 print(f"\nDone — {len(profiles)} profiles generated.")

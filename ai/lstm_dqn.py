@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 
 class LSTMDQNNet(nn.Module):
+    """LSTM-based DQN that returns Q-values, a lead probability, and updated hidden state."""
+
     def __init__(self, state_dim: int, action_dim: int, hidden: int = 128):
+        """Build encoder, single-layer LSTM, Q-value head, and sigmoid lead head."""
         super().__init__()
         self.hidden_size = hidden
         self.encoder = nn.Sequential(
@@ -31,6 +34,7 @@ class LSTMDQNNet(nn.Module):
         )
         
     def forward(self, x, hidden=None):
+        """Encode x, run LSTM, and return (Q-values, lead probability, hidden state) for the last timestep."""
         if x.dim() == 2:
             x = x.unsqueeze(1)   
         enc = self.encoder(x)    
@@ -39,7 +43,9 @@ class LSTMDQNNet(nn.Module):
         q = self.head(last) 
         lead = self.head_lead(last)
         return q, lead, hidden
+    
     def init_hidden(self, batch_size: int = 1, device: str = "cpu"):
+        """Return zeroed (h_0, c_0) LSTM state for the start of an episode."""
         h = torch.zeros(1, batch_size, self.hidden_size, device=device)
         c = torch.zeros(1, batch_size, self.hidden_size, device=device)
         return (h, c)

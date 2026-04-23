@@ -7,10 +7,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 client = Groq(api_key=os.environ.get("GROQ_API_KEY", "api key"))
 
 
-
-
-
 def merge_profiles(old, new):
+    """Exponentially smooth numeric profile fields (70/30) and increment session count."""
     weight = 0.7
     numeric_keys =[
         "aggression_score", "avg_displacement", "avg_center_dist",
@@ -25,6 +23,7 @@ def merge_profiles(old, new):
     return merged
 
 def synthesis(log_path, profile_name):
+    """Aggregate a session log into stats, send them to the LLM, merge with prior profile, and save."""
     print(f"synthesis() called with log_path={log_path}, profile={profile_name}")
 
     try:
@@ -101,7 +100,7 @@ def synthesis(log_path, profile_name):
         "evasion_rate":          log[-1].get("evasion_rate", 0.0),
     }
 
-    print(f"\nSending to Gemini:\n{json.dumps(summary, indent=2)}")
+    print(f"\nSending to groq:\n{json.dumps(summary, indent=2)}")
 
     prompt = f"""
 You are analyzing gameplay data from a top-down shooter game.
@@ -193,7 +192,7 @@ Return ONLY the JSON. No explanation, no markdown, no backticks.
         return profile
 
     except json.JSONDecodeError as e:
-        print(f"Failed to parse Gemini response as JSON: {e}")
+        print(f"Failed to parse groq response as JSON: {e}")
         print(f"Raw response was:\n{response.text}")
         return None
     except Exception as e:

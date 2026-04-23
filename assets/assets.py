@@ -1,9 +1,5 @@
-
 import pygame
 from settings import volume
-
-
-
 
 def load_assets(screen_width, screen_height):
     return None

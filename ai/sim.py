@@ -18,6 +18,7 @@ from entities.ai_player import AIPlayer, apply_buff, all_buffs
 
 
 class SimProjectile:
+    """Lightweight headless projectile that moves each tick and reports when it leaves the screen."""
     def __init__(self, x, y, dx, dy, radius, damage, source_enemy=None):
         self.pos          = pygame.Vector2(x, y)
         self.velocity     = pygame.Vector2(dx, dy) * projectile_speeds
@@ -26,20 +27,19 @@ class SimProjectile:
         self.source_enemy = source_enemy
 
     def update(self, dt):
+        """Advance position by velocity * dt."""
         self.pos += self.velocity * dt
 
     def out_of_bounds(self):
+        """Return True if the projectile has fully exited the screen rectangle."""
         return (self.pos.x < -self.radius or self.pos.x > screen_width + self.radius or
                 self.pos.y < -self.radius or self.pos.y > screen_height + self.radius)
 
 
 class SimPlayer(AIPlayer):
-    """
-    Wraps AIPlayer for headless simulation — uses the exact same profile-driven
-    dodge, targeting, and firing logic as the real game so the DQN trains
-    against the actual opponent it will face.
-    """
+    """Wraps AIPlayer for headless simulation — profile-driven dodge, targeting, and firing logic matches the real game so the DQN trains against its actual opponent."""
     def __init__(self, profile_name=None):
+        """Initialise AIPlayer silently, then wire up the headless fire callback."""
         import sys, io
         _devnull = io.StringIO()
         _stdout, sys.stdout = sys.stdout, _devnull
@@ -56,6 +56,7 @@ class SimPlayer(AIPlayer):
         self.rate  = player_xpRate
 
     def _fire(self, from_pos, to_pos):
+        """Append a SimProjectile to the shared list instead of drawing to screen."""
         d = pygame.Vector2(to_pos) - pygame.Vector2(from_pos)
         if d.length() > 0:
             d = d.normalize()
@@ -65,7 +66,7 @@ class SimPlayer(AIPlayer):
             )
 
     def update(self, dt, sim_enemies, enemy_projectiles, player_projectiles):
-        """Drive the AIPlayer input() loop headlessly."""
+        """Drive the AIPlayer input() loop headlessly, temporarily swapping the global enemy list."""
         if not self.alive:
             return
 
@@ -73,7 +74,7 @@ class SimPlayer(AIPlayer):
         try:
             _em.enemies[:]        = sim_enemies
             self._sim_proj_list   = player_projectiles
-            self._enemy_proj_list = enemy_projectiles  # inject so dodge_projectiles() works
+            self._enemy_proj_list = enemy_projectiles 
             self.input(dt)
             self.pos  += self.vel * dt
             self.pos.x = max(self.radius, min(screen_width  - self.radius, self.pos.x))
@@ -83,6 +84,7 @@ class SimPlayer(AIPlayer):
 
 
 def spawn_edge(margin):
+    """Return a random (x, y) position on one of the four screen edges, inset by margin."""
     side = random.choice(["top", "bottom", "left", "right"])
     m    = margin
     if side == "top":    return random.randint(m, screen_width-m),  m
@@ -92,13 +94,17 @@ def spawn_edge(margin):
 
 
 class Simulation:
+    """Self-contained headless environment that runs the game loop and exposes a step() RL interface."""
+
     def __init__(self, n_enemies: int = 3, max_steps: int = 3000, profile_name: str | None = None):
+        """Store episode config; call reset() before the first step."""
         self.n_enemies    = n_enemies
         self.max_steps    = max_steps
         self.profile_name = profile_name
         self.step_count   = 0
 
     def reset(self):
+        """Rebuild player, enemies, and projectile lists; return initial per-enemy state vectors."""
         profile_path = os.path.join("replays", self.profile_name, "profile.json") if self.profile_name else None
         if profile_path and os.path.exists(profile_path):
             with open(profile_path) as f:
@@ -121,7 +127,6 @@ class Simulation:
 
         self._spawn_enemies(self.n_enemies)
 
-        # Randomise player start position so enemies can't overfit to a fixed spawn
         self.player.pos = pygame.Vector2(
             random.randint(200, screen_width  - 200),
             random.randint(200, screen_height - 200)
@@ -134,9 +139,11 @@ class Simulation:
         return self._get_states()
 
     def enemies(self):
+        """Return the live global enemy list."""
         return _global_enemies
 
     def _spawn_enemies(self, count):
+        """Spawn count enemies of random type at random edge positions."""
         for _ in range(count):
             type_index      = random.randint(0, 5)
             x, y            = spawn_edge(margin)
@@ -145,6 +152,7 @@ class Simulation:
             e.hit_landed    = False
 
     def _level_up_player(self):
+        """Apply a profile-driven (or random fallback) upgrade when the player levels up."""
         upgrade = self.player.pick_upgrade() if hasattr(self.player, "pick_upgrade") else random.choice(all_buffs)
         apply_buff(self.player, upgrade)
 
@@ -326,6 +334,7 @@ class Simulation:
         return self._get_states(), rewards, dones, info
 
     def _get_states(self):
+        """Build and return a state vector for every enemy slot (zeros for dead enemies)."""
         states = []
         for enemy in _global_enemies:
             if enemy.health > 0:
