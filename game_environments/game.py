@@ -71,7 +71,7 @@ class Game:
             direction = direction.normalize()
             self.player_projectiles.append(Projectile(
                 origin.x, origin.y, direction.x, direction.y,
-                player_projectile_radius, player_damage, player_projectile_color
+                player_projectile_radius, player_damage, "assets/sprites/PlayerBullet.png"
             ))
 
 

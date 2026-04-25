@@ -8,7 +8,7 @@ from settings import (screen_height, screen_width, margin, bar_h, bar_w, color_h
 from ai.dqn_enemy import build_state
 import os
 from ai.dqn_enemy import DQNagent
-from entities.enemy_list import types
+from entities.enemy_list import types, spriteCache
 
 enemies = []
 
@@ -74,6 +74,13 @@ class Enemy:
         self.xp              = unit["xp"]
         self._apply_profile_scaling()
         enemies.append(self)
+        # sprites
+        if unit["name"] not in spriteCache:
+            spriteCache[unit["name"]] = pygame.image.load(unit["sprite"]).convert_alpha()
+        originalImage = spriteCache[unit["name"]]
+        diameter = self.radius * 2
+        self.image = pygame.transform.scale(originalImage, (diameter, diameter))
+        self.rect = self.image.get_rect(center=(self.pos.x, self.pos.y))
 
     def can_fire(self):
         """Return True if the fire cooldown has elapsed."""
@@ -138,7 +145,7 @@ class Enemy:
                     Projectile(
                         self.pos.x, self.pos.y,
                         direction.x, direction.y,
-                        self.proj_radius, self.damage, enemy_projectile_color
+                        self.proj_radius, self.damage, "assets/sprites/EnemyBullet.png"
                     )
                 )
 
@@ -162,7 +169,7 @@ class Enemy:
                 enemy_projectiles.append(Projectile(
                     self.pos.x, self.pos.y,
                     direction.x, direction.y,
-                    self.proj_radius, self.damage, enemy_projectile_color
+                    self.proj_radius, self.damage, "assets/sprites/EnemyBullet.png"
                 ))
 
     def take_damage(self, damage):
@@ -172,7 +179,10 @@ class Enemy:
 
     def draw(self, screen):
         """Draw the enemy circle and a health bar above it."""
-        pygame.draw.circle(screen, self.color, self.pos, self.radius)
+        # pygame.draw.circle(screen, self.color, self.pos, self.radius)
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+        screen.blit(self.image, self.rect)
+
         bar_x    = self.pos.x - bar_w // 2
         bar_y    = self.pos.y - self.radius - 10
         pygame.draw.rect(screen, color_health_bg,  (bar_x, bar_y, bar_w, bar_h))
