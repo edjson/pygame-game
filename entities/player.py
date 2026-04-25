@@ -21,6 +21,11 @@ class Player:
         self.rate          = player_xpRate
         self.level         = 1
         self.fire_callback = None
+        # sprites
+        originalImage = pygame.image.load("assets/sprites/PlayerSprite.png").convert_alpha()
+        diameter = self.radius * 2
+        self.image = pygame.transform.scale(originalImage, (diameter, diameter))
+        self.rect = self.image.get_rect(center=(self.pos.x, self.pos.y))
 
     def input(self, dt):
         """Initialise position, stats, and XP progression from settings defaults."""
@@ -63,7 +68,9 @@ class Player:
 
     def draw(self, screen):
         """Register the function invoked when the player fires; signature: callback(from_pos, cursor_pos)."""
-        pygame.draw.circle(screen, settings.player_color, (int(self.pos.x), int(self.pos.y)), self.radius)
+        # pygame.draw.circle(screen, settings.player_color, (int(self.pos.x), int(self.pos.y)), self.radius)
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+        screen.blit(self.image, self.rect)
         self.draw_health_bar(screen)
 
     def set_fire_callback(self, callback):
