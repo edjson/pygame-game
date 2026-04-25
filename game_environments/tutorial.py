@@ -2,10 +2,13 @@ import pygame
 import settings
 from entities.player import Player
 from entities.projections import Projectile
-from settings import (screen_width, screen_height, thirds, cx, cy, text_color, cy, cx, font_small, warning_radius,
-                      enemies_count_rate, player_projectile_radius, player_damage, player_projectile_color)
-from entities.enemy import enemies, spawn_enemies, spawn_tutorial_unit, init_agent
+from settings import (screen_width, screen_height, thirds, cx, cy, text_color, font_small, warning_radius,
+                      enemies_count_rate, player_projectile_radius, player_damage, player_projectile_color,
+                      adapt_from_stage)
+from entities.enemy import enemies, spawn_enemies, spawn_tutorial_unit, init_agent, update_profile
 from ai.llm import synthesis
+from core.behavior_tracker import compute_live_profile
+from entities.particles import effect
 import json
 import os
 import time
@@ -17,7 +20,6 @@ class InputButton:
     """A keyboard or mouse button widget that highlights on press, used in the tutorial UI."""
 
     def __init__(self, x, y, size, letter, key=None, mouse_button=None):
-        """Position the button, bind it to an optional key or mouse button, and reset state."""
         self.rect         = pygame.Rect(x, y, size, size)
         self.letter       = letter
         self.key          = key
@@ -26,13 +28,11 @@ class InputButton:
         self.pressed      = False
 
     def handle_events(self, event):
-        """Update highlighted and pressed state from a pygame event."""
         if event.type == pygame.KEYDOWN and event.key == self.key:
             self.highlighted = True
             self.pressed     = True
         if event.type == pygame.KEYUP and event.key == self.key:
             self.highlighted = False
-
         if self.mouse_button:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == self.mouse_button:
                 self.highlighted = True
@@ -41,7 +41,6 @@ class InputButton:
                 self.highlighted = False
 
     def draw(self, surface):
-        """Update highlighted and pressed state from a pygame event."""
         if self.highlighted:
             pygame.draw.rect(surface, "yellow", self.rect)
         pygame.draw.rect(surface, "white", self.rect, 4)
@@ -54,16 +53,13 @@ class Tutorial:
     """Guided tutorial that teaches WASD movement and mouse firing before transitioning to normal gameplay."""
 
     current_stage = 1
+
     def __init__(self, profile_name=None):
-        """Load audio, initialise the agent, and reset all state."""
         self.profile_name = profile_name
-        self.sound = pygame.mixer.Sound(r"assets\audio\arnav_geddada-ui-sound-374228.mp3")
-        self.sound.set_volume(settings.volume / 100)
         init_agent(profile=None)
         self.reset()
 
     def reset(self):
-        """Clear all entities and counters, then rebuild tutorial button layout."""
         if self.current_stage > settings.record:
             settings.record = self.current_stage
 
@@ -73,6 +69,7 @@ class Tutorial:
         self.player.set_fire_callback(self._fire)
         self.player_projectiles   = []
         self.enemy_projectiles    = []
+        self.particles            = pygame.sprite.Group()
         self.enemies              = enemies
         self.elapsed              = 0.0
         self.spawn_delay          = 3
@@ -99,10 +96,10 @@ class Tutorial:
         self.evasions_failed      = 0
         self.stage_kills          = 0
         self.stage_total          = 1
+        self.live_profile         = None
         self.init_tutorial()
 
     def init_tutorial(self):
-        """Create the WASD and mouse-1 InputButton widgets centred on screen."""
         button_size = 80
         gap         = 90
         base_x      = cx - gap // 2
@@ -127,7 +124,6 @@ class Tutorial:
             ))
 
     def handle_tutorial_event(self, event):
-        """Forward a pygame event to all tutorial buttons while the tutorial is active."""
         if self.tutorial_done:
             return
         for button in self.tutorial_buttons.values():
@@ -136,7 +132,6 @@ class Tutorial:
             button.handle_events(event)
 
     def draw_tutorial(self, screen):
-        """Render the current tutorial prompt and button hints."""
         if self.tutorial_done:
             return
         if self.tutorial_stage == 1:
@@ -150,7 +145,6 @@ class Tutorial:
             self.tutorial_mouse_buttons["1"].draw(screen)
 
     def capture_frame(self):
-        """Snapshot the current game state into a dict for the behavior log."""
         cursor        = pygame.mouse.get_pos()
         alive_enemies = [e for e in self.enemies if e.health > 0]
         distances     = [e.pos.distance_to(self.player.pos) for e in alive_enemies]
@@ -221,40 +215,45 @@ class Tutorial:
         }
 
     def save_log(self):
-        """Write the behavior log to disk and launch LLM synthesis in a background thread."""
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path     = os.path.join(BASE_DIR, "replays", self.profile_name)
         print(f"[save_log] BASE_DIR={BASE_DIR}")
         print(f"[save_log] saving to: {path}")
         print(f"[save_log] frames captured: {len(self.behavior_log)}")
         print(f"[save_log] shots fired={self.shots_fired} hit={self.shots_hit}")
-
         try:
             os.makedirs(path, exist_ok=True)
         except OSError as e:
             print(f"Failed to create replay directory {path}: {e}")
             raise
-
         timestamp = int(time.time())
         filepath  = os.path.join(path, f"{self.profile_name}_run_{timestamp}.json")
         with open(filepath, "w") as f:
             json.dump(self.behavior_log, f)
-
         print(f"Behavior log saved to: {filepath}")
         thread = threading.Thread(target=self._run_synthesis, args=(filepath,), daemon=True)
         thread.start()
         return filepath
 
     def _run_synthesis(self, log_path):
-        """Run LLM profile synthesis in a background thread, printing any traceback on failure."""
         try:
             synthesis(log_path, self.profile_name)
         except Exception:
             import traceback
             traceback.print_exc()
 
+    def _maybe_adapt(self):
+        """Compute and push a live profile to enemies once adapt_from_stage has been reached."""
+        if self.current_stage <= adapt_from_stage:
+            return
+        if not self.behavior_log:
+            return
+        profile = compute_live_profile(self.behavior_log, self.current_stage)
+        if profile:
+            self.live_profile = profile
+            update_profile(profile)
+
     def _update_evasion(self):
-        """Track enemy projectiles entering warning range and record hits or successful dodges."""
         current_ids = {id(ep) for ep in self.enemy_projectiles}
         for ep in self.enemy_projectiles:
             eid  = id(ep)
@@ -274,7 +273,6 @@ class Tutorial:
                 self.evasions_successful += 1
 
     def _mark_evasion_hit(self):
-        """Flag the first tracked projectile as having hit the player."""
         for ep in self.enemy_projectiles:
             eid = id(ep)
             if eid in self._tracked_projectiles:
@@ -282,14 +280,13 @@ class Tutorial:
                 break
 
     def update(self, dt):
-        """Advance the game by dt; handles input, projectiles, enemy AI, stage progression, and logging. Returns 'game_over', 'level', or None."""
         if self.player.health <= 0:
             return "game_over"
 
         self.elapsed += dt
         self.player.update(dt)
 
-        # Player projectile updates
+        # Player projectile collisions
         for projectile in self.player_projectiles[:]:
             projectile.update(dt)
             if projectile.out_of_bounds():
@@ -302,6 +299,7 @@ class Tutorial:
                         self.shots_hit   += 1
                         self.player.xp   += enemy.xp
                         enemies.remove(enemy)
+                        effect(enemy, self.particles)
                         self.stage_kills += 1
                         if self.player.xp >= self.player.next:
                             self.player.xp  -= self.player.next
@@ -314,6 +312,8 @@ class Tutorial:
                     if projectile in self.player_projectiles:
                         self.player_projectiles.remove(projectile)
                     break
+
+        self.particles.update(dt)
 
         # Tutorial flow
         if not self.tutorial_done:
@@ -358,6 +358,7 @@ class Tutorial:
                 enemy.update(dt, self.player, self.player_projectiles, self.enemy_projectiles)
 
         if len(enemies) == 0 and self.spawn_queue == 0:
+            self._maybe_adapt()
             self.current_stage += 1
             total              = round(self.current_stage * enemies_count_rate)
             self.stage_kills   = 0

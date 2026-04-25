@@ -55,9 +55,11 @@ class MainMenu:
         title_surf   = font_big.render(title, True, text_color)
         sub          = font_small.render("Enemies learn and coordinate in real time", True, text_passive)
         record_score = font_small.render(f"Record: {settings.record}", True, text_passive)
+        song_credit = font_small.render("Chillpeach - In Dreamland", True, text_passive)
         screen.blit(title_surf,   title_surf.get_rect(center=(cx, thirds)))
         screen.blit(sub,          sub.get_rect(center=(cx, thirds + 55)))
         screen.blit(record_score, record_score.get_rect(topleft=(10, 10)))
+        screen.blit(song_credit,  song_credit.get_rect(bottomleft=(0, screen_height)))
         manager.draw_ui(screen)
 
     def hide(self):

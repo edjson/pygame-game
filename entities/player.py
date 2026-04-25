@@ -2,6 +2,8 @@ import pygame
 from settings import player_radius, player_speed, player_health, color_health_bg, color_health_bar, player_damage, cx, cy, player_next, player_xpRate, player_regen, screen_height, screen_width
 import settings
 from entities.projections import Projectile
+from assets.assets import sound_effects
+shoot_sfx = sound_effects("47313572-ui-pop-sound-316482.mp3")
 
 class Player:
     """Human-controlled player with WASD movement, health, XP, and callback-based firing."""
@@ -73,3 +75,4 @@ class Player:
         """Fire a projectile toward cursor_pos via the registered fire callback."""
         if self.fire_callback:
             self.fire_callback(self.pos, cursor_pos)
+            shoot_sfx.play()

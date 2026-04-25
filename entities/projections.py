@@ -1,7 +1,7 @@
 import pygame
 import math
-from settings import projectile_speeds, screen_height, screen_width
-
+from settings import projectile_speeds, screen_height, screen_width, color_options
+import random 
 class Projectile:
     """Moving circular projectile with damage, color, and screen-bounds detection."""
     def __init__(self, x, y, direction_x, direction_y, radius, damage, color):
@@ -9,7 +9,7 @@ class Projectile:
         self.velocity = pygame.Vector2(direction_x, direction_y) * projectile_speeds
         self.radius   = radius
         self.damage   = damage
-        self.color    = color
+        self.color    = random.choice(color_options)
 
     def update(self, dt):
         """advances position by velocity * dt"""
