@@ -1,3 +1,9 @@
+Song: Chillpeach - In Dreamland : https://www.youtube.com/watch?v=DSWYAclv2I8
+
+Fire sound : https://pixabay.com/sound-effects/film-special-effects-ui-pop-sound-316482/
+
+Death sound: https://pixabay.com/sound-effects/film-special-effects-happy-pop-2-185287/
+
 # Adaptive Enemy AI — Pygame Top-Down Shooter
 
 A top-down shooter where enemies learn from how you play. After each session the game analyses your behaviour, builds a profile, and uses it to adapt enemy speed, aggression, targeting strategy, and fire rate in real time.

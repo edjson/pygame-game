@@ -11,6 +11,7 @@ from entities.enemy import enemies
 import settings
 import random
 
+
 class renderer:
     """Handles all screen drawing: world entities, HUD health bar, stage info, and player stats."""
 
@@ -25,8 +26,13 @@ class renderer:
         for i in game.enemies:
             if i.health > 0:
                 i.draw(self.screen)
+        game.particles.draw(self.screen)
         for i in game.player_projectiles:
-            pygame.draw.circle(self.screen, player_projectile_color, i.pos, i.radius)
+            if settings.trace == True:
+                direction = i.velocity.normalize()
+                end = i.pos + direction * screen_width
+                pygame.draw.line(self.screen, random.choice(color_options), (int(i.pos.x), int(i.pos.y)), (int(end.x), int(end.y)), 1)
+            pygame.draw.circle(self.screen, i.color, i.pos, i.radius)
         
         for i in game.enemy_projectiles:
             #trajectory lines
@@ -34,7 +40,7 @@ class renderer:
                 direction = i.velocity.normalize()
                 end = i.pos + direction * screen_width
                 pygame.draw.line(self.screen, random.choice(color_options), (int(i.pos.x), int(i.pos.y)), (int(end.x), int(end.y)), 1)
-            pygame.draw.circle(self.screen, enemy_projectile_color, (int(i.pos.x), int(i.pos.y)), i.radius)
+            pygame.draw.circle(self.screen, i.color, (int(i.pos.x), int(i.pos.y)), i.radius)
 
         bar_w = 250
         bar_h = 25

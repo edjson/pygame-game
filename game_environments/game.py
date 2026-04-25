@@ -38,6 +38,7 @@ class Game:
         self.player.set_fire_callback(self._fire)
         self.player_projectiles   = []
         self.enemy_projectiles    = []
+        self.particles            = pygame.sprite.Group()
         self.enemies              = enemies
         self.elapsed              = 0.0
         self.spawn_delay          = 3
@@ -285,7 +286,7 @@ class Game:
                     if projectile in self.player_projectiles:
                         self.player_projectiles.remove(projectile)
                     break
-
+        self.particles.update(dt)
         # Enemy projectile collisions
         for ep in self.enemy_projectiles[:]:
             ep.update(dt)
