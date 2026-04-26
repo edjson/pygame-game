@@ -14,6 +14,12 @@ import os
 import time
 from entities.enemy_list import types
 import threading
+from ai.train import train_single, discover_profiles
+from ai.dqn_enemy import DQNagent
+from entities.enemy_list import build_types
+from assets.assets import sound_effects
+from assets.assets import sound_effects
+death_sfx = sound_effects("floraphonic-happy-pop-2-185287.mp3")
 
 
 class InputButton:
@@ -96,6 +102,7 @@ class Tutorial:
         self.evasions_failed      = 0
         self.stage_kills          = 0
         self.stage_total          = 1
+        self.train_thread         = None
         self.live_profile         = None
         self.init_tutorial()
 
@@ -120,7 +127,7 @@ class Tutorial:
             direction = direction.normalize()
             self.player_projectiles.append(Projectile(
                 origin.x, origin.y, direction.x, direction.y,
-                player_projectile_radius, player_damage, player_projectile_color
+                player_projectile_radius, player_damage, "assets/sprites/PlayerBullet.png"
             ))
 
     def handle_tutorial_event(self, event):
@@ -143,6 +150,30 @@ class Tutorial:
             msg = font_small.render("Use Mouse 1 To Shoot", True, text_color)
             screen.blit(msg, msg.get_rect(center=(cx, thirds)))
             self.tutorial_mouse_buttons["1"].draw(screen)
+
+    
+    def _start_training(self):
+        if self.train_thread is not None and self.train_thread.is_alive():
+            return
+        self.train_thread = threading.Thread(target=self._run_training, daemon=True)
+        self.train_thread.start()
+
+    def _run_training(self):
+        """Run a short training session in the background."""
+        try:
+        
+            build_types()
+            enemy_agent = DQNagent()
+            if os.path.exists("ai/weights/weights.pt"):
+                enemy_agent.load("ai/weights/weights.pt")
+            profiles = discover_profiles()
+            train_single(enemy_agent, profiles)
+            enemy_agent.save("ai/weights/weights.pt")
+            print("[Game] Background training complete, weights saved.")
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    # Frame capture
 
     def capture_frame(self):
         cursor        = pygame.mouse.get_pos()
@@ -233,6 +264,7 @@ class Tutorial:
         print(f"Behavior log saved to: {filepath}")
         thread = threading.Thread(target=self._run_synthesis, args=(filepath,), daemon=True)
         thread.start()
+        self._start_training()
         return filepath
 
     def _run_synthesis(self, log_path):
@@ -298,6 +330,7 @@ class Tutorial:
                     if enemy.take_damage(self.player.damage):
                         self.shots_hit   += 1
                         self.player.xp   += enemy.xp
+                        death_sfx.play()
                         enemies.remove(enemy)
                         effect(enemy, self.particles)
                         self.stage_kills += 1

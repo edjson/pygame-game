@@ -31,5 +31,6 @@ class Projectile:
     def draw(self, screen):
         """draws projectile"""
         # pygame.draw.circle(screen, self.color, (int(self.pos.x), int(self.pos.y)), self.radius)
-        self.rect.center = (int(self.pos.x), int(self.pos.y))
-        screen.blit(self.image, self.rect)
+        angle = math.degrees(math.atan2(-self.velocity.y, self.velocity.x)) - 90
+        rotated = pygame.transform.rotate(self.image, angle)
+        screen.blit(rotated, rotated.get_rect(center=(int(self.pos.x), int(self.pos.y))))

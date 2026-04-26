@@ -32,7 +32,7 @@ class renderer:
                 direction = i.velocity.normalize()
                 end = i.pos + direction * screen_width
                 pygame.draw.line(self.screen, random.choice(color_options), (int(i.pos.x), int(i.pos.y)), (int(end.x), int(end.y)), 1)
-            pygame.draw.circle(self.screen, i.color, i.pos, i.radius)
+            i.draw(self.screen)
             #i.rect.center = (int(i.pos.x), int(i.pos.y))       # PlayerBullet sprite blends in with the dark blackground
             #self.screen.blit(i.image, i.rect)
         

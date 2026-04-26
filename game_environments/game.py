@@ -7,11 +7,18 @@ from settings import (screen_width, screen_height, cx, cy, warning_radius, enemi
 from entities.enemy import enemies, spawn_enemies, init_agent, update_profile
 from ai.llm import synthesis
 from core.behavior_tracker import compute_live_profile
+from entities.particles import effect
 import json
 import os
 import time
 import threading
 from entities.enemy_list import types
+from ai.train import train_single, discover_profiles
+from ai.dqn_enemy import DQNagent
+from entities.enemy_list import build_types
+from assets.assets import sound_effects
+death_sfx = sound_effects("floraphonic-happy-pop-2-185287.mp3")
+
 
 
 
@@ -25,7 +32,6 @@ class Game:
         self.profile_name = profile_name
         init_agent(profile=None) 
         self.reset()
-        self.train_thread = None
 
     def reset(self):
         """Clear all entities and counters, ready for a fresh run."""
@@ -62,6 +68,7 @@ class Game:
         self.evasions_failed      = 0
         self.stage_kills          = 0
         self.stage_total          = 1
+        self.train_thread         = None
         self.live_profile         = None  
 
     def _fire(self, origin, target):
@@ -87,7 +94,29 @@ class Game:
             self.live_profile = profile
             update_profile(profile)  
 
+    def _start_training(self):
+        if self.train_thread is not None and self.train_thread.is_alive():
+            return
+        self.train_thread = threading.Thread(target=self._run_training, daemon=True)
+        self.train_thread.start()
+
+    def _run_training(self):
+        """Run a short training session in the background."""
+        try:
+        
+            build_types()
+            enemy_agent = DQNagent()
+            if os.path.exists("ai/weights/weights.pt"):
+                enemy_agent.load("ai/weights/weights.pt")
+            profiles = discover_profiles()
+            train_single(enemy_agent, profiles)
+            enemy_agent.save("ai/weights/weights.pt")
+            print("[Game] Background training complete, weights saved.")
+        except Exception:
+            import traceback
+            traceback.print_exc()
     # Frame capture
+
     def capture_frame(self):
         """Snapshot the current game state into a dict for the behavior log."""
         cursor        = pygame.mouse.get_pos()
@@ -172,6 +201,7 @@ class Game:
         print(f"[Game] Behavior log saved: {filepath}  ({len(self.behavior_log)} frames)")
         thread = threading.Thread(target=self._run_synthesis, args=(filepath,), daemon=True)
         thread.start()
+        self._start_training()
         return filepath
 
     def _run_synthesis(self, log_path):
@@ -273,7 +303,9 @@ class Game:
                     if enemy.take_damage(self.player.damage):
                         self.shots_hit   += 1
                         self.player.xp   += enemy.xp
+                        death_sfx.play()
                         enemies.remove(enemy)
+                        effect(enemy, self.particles)
                         self.stage_kills += 1
                         if self.player.xp >= self.player.next:
                             self.player.xp  -= self.player.next
