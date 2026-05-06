@@ -17,88 +17,131 @@ from game_environments.tutorial import Tutorial
 from menu.input_menu import InputMenu
 from entities.enemy_list import build_types
 import traceback
-import json
-import os
-from entities.enemy_list import types
+import threading
 from core.profile_manager import init_profile
 from assets.assets import Music
 
-music = Music()
-
-
-locked_mouse = False
 pygame.init()
-pygame.mixer.init() 
+pygame.mixer.init()
 
-
-def get_profile_name(screen, clock):
-    """Render a name-entry screen and return the typed string when the player presses Enter."""
-    name = ""
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN and name.strip():
-                    return name.strip()
-                elif event.key == pygame.K_BACKSPACE:
-                    name = name[:-1]
-                elif len(name) < 16:
-                    name += event.unicode
-
-        screen.fill((20, 20, 20))
-        label      = font_big.render("Enter Your Name:", True, text_color)
-        input_surf = font_big.render(name + "|", True, input_color)
-        hint       = font_small.render("Press ENTER to confirm", True, text_passive)
-
-        screen.blit(label,      label.get_rect(center=(cx, cy - 60)))
-        screen.blit(input_surf, input_surf.get_rect(center=(cx, cy)))
-        screen.blit(hint,       hint.get_rect(center=(cx, cy + 50)))
-
-        pygame.display.flip()
-        clock.tick(fps)
-
-
-def load_profile(profile_name):
-    """Return the profile dict from replays/<profile_name>/profile.json, or None if not found."""
-    path = os.path.join("replays", profile_name, "profile.json")
-    if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
-    return None
-
-
-# setup
-screen  = pygame.display.set_mode((screen_width, screen_height))
+screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption(title)
-clock   = pygame.time.Clock()
-assets  = load_assets()
-manager = pygame_gui.UIManager((screen_width, screen_height))
-tutorial   = None
-simulation = None
-render     = renderer(screen)
-handler    = EventHandler(manager)
+clock  = pygame.time.Clock()
 
-menus = {
-    "main":       MainMenu(manager, assets),
-    "game_over":  GameOverMenu(manager),
-    "pause":      PauseMenu(manager),
-    "settings":   SettingsMenu(manager),
-    "level":      LevelUpMenu(manager),
-    "input_menu": InputMenu(manager)
-}
+_load_done   = threading.Event()
+_load_error  = None         
+_load_status = ""         
+_assets       = None
+_manager      = None
+_menus        = None
+_music        = None
+_profile_name = None
+_saved_profile= None
+_game         = None
 
-build_types()
-profile_name, saved_profile = init_profile()
-game = Game(profile_name=profile_name)
+
+def _background_loader():
+    """Runs in a worker thread and writes to module-level names."""
+    global _assets, _manager, _menus, _music
+    global _profile_name, _saved_profile, _game, _load_status, _load_error
+
+    try:
+        _load_status = "Loading assets…"
+        _assets = load_assets()
+
+        _load_status = "Building enemy types…"
+        build_types()
+
+        _load_status = "Reading profile…"
+        _profile_name, _saved_profile = init_profile()
+
+        _load_status = "Creating UI…"
+        _manager = pygame_gui.UIManager((screen_width, screen_height))
+
+        _menus = {
+            "main":       MainMenu(_manager, _assets),
+            "game_over":  GameOverMenu(_manager),
+            "pause":      PauseMenu(_manager),
+            "settings":   SettingsMenu(_manager),
+            "level":      LevelUpMenu(_manager),
+            "input_menu": InputMenu(_manager),
+        }
+
+        _load_status = "Preparing music…"
+        _music = Music()
+
+        _load_status = "Setting up game…"
+        _game = Game(profile_name=_profile_name)
+
+        _load_status = "Done"
+    except Exception as exc:
+        _load_error = exc
+        traceback.print_exc()
+    finally:
+        _load_done.set()
+
+loader_thread = threading.Thread(target=_background_loader, daemon=True)
+loader_thread.start()
+
+
+def draw_loading_screen(progress_anim: float):
+    """Draws a loading screen while the loader runs."""
+    screen.fill((20, 20, 20))
+
+    title_surf = font_big.render(title, True, text_color)
+    screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 80)))
+
+    status_surf = font_small.render(_load_status, True, text_passive)
+    screen.blit(status_surf, status_surf.get_rect(center=(cx, cy)))
+    bar_w  = 300
+    bar_h  = 4
+    bar_x  = cx - bar_w // 2
+    bar_y  = cy + 40
+    fill_w = int((0.5 + 0.5 * __import__('math').sin(progress_anim * 3.14)) * bar_w)
+    pygame.draw.rect(screen, (60, 60, 60),  (bar_x, bar_y, bar_w, bar_h), border_radius=2)
+    pygame.draw.rect(screen, (180, 180, 180), (bar_x, bar_y, fill_w, bar_h), border_radius=2)
+
+    pygame.display.flip()
+
+
+anim_t = 0.0
+while not _load_done.is_set():
+    dt_raw = clock.tick(fps) / 1000
+    anim_t += dt_raw
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            exit()
+
+    draw_loading_screen(anim_t)
+
+if _load_error is not None:
+    print(f"[FATAL] Background loader failed: {_load_error}")
+    pygame.quit()
+    exit(1)
+
+assets       = _assets
+manager      = _manager
+menus        = _menus
+music        = _music
+profile_name = _profile_name
+saved_profile= _saved_profile
+game         = _game
+
+render  = renderer(screen)
+handler = EventHandler(manager)
+
 menus["main"].show()
 state       = "main"
 dt          = 0
 back_state  = None
 paused_from = None
 last_mode   = "playing"
-# Transisiton handler
+locked_mouse = False
+tutorial    = None
+simulation  = None
+
 while state != "quit":
 
     if state == "tutorial" or (state == "level" and last_mode == "tutorial"):
@@ -120,7 +163,7 @@ while state != "quit":
         continue
 
     if new_state != state:
-        
+
         # main -> simulation
         if state == "main" and new_state == "simulation":
             simulation = Simulation(profile_name=settings.profile_name)
@@ -205,7 +248,7 @@ while state != "quit":
             state = "settings"
             continue
 
-        # pause -> main 
+        # pause -> main
         if state == "pause" and new_state == "main":
             music.stop()
             paused_from = None
@@ -216,7 +259,7 @@ while state != "quit":
 
         # settings -> back
         if state == "settings" and new_state == "back":
-            music.set_volume()  
+            music.set_volume()
             menus["settings"].hide()
             if back_state == "main":
                 menus["main"].show()
@@ -251,6 +294,7 @@ while state != "quit":
             menus["game_over"].show()
             state = "game_over"
             continue
+
         if state == "game" and new_state == "game_over":
             music.stop()
             try:
@@ -268,7 +312,7 @@ while state != "quit":
             state = "main"
             continue
 
-        # game_over -> restart  (restart music from beginning)
+        # game_over -> restart
         if state == "game_over" and new_state == "restart":
             music.restart()
             menus["game_over"].hide()
@@ -303,7 +347,6 @@ while state != "quit":
             state = "simulation"
             continue
 
-    # update and draw
     manager.update(dt)
 
     if state == "playing" or (state == "pause" and paused_from == "playing"):
@@ -336,7 +379,6 @@ while state != "quit":
                 traceback.print_exc()
             menus["game_over"].show()
             state = "game_over"
-
         elif result == "level":
             last_mode = "playing"
             menus["level"].show()

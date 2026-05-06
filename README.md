@@ -25,9 +25,9 @@ Install all packages in requirements.txt:
 pip install -r requirements.txt
 ```
 
-To set your Groq API key in the terminal:
+To set your Groq API replace "api key" in ai/llm.py:
 ```bash
-export GROQ_API_KEY=your_key_here
+client = Groq(api_key=os.environ.get("GROQ_API_KEY", "api key"))
 ```
 
 Run the game:

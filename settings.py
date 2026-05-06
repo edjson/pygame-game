@@ -17,7 +17,7 @@ bar_w                    = 50
 bar_h                    = 5
 
 #text
-title                    = "adaptive ememy player analysis"
+title                    = "Adaptive Enemy Player Analysis"
 describe                 = "creating model human profiles to for machine learning enemies"
 transparent              = (0,0,0,180)
 background               = "black"

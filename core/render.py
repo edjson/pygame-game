@@ -21,7 +21,7 @@ class renderer:
 
     def draw_game(self, player, game):
         """Draw health bar, stage label, level, kill count, projectiles, trace and stat readouts."""
-        self.screen.fill(background)
+        self.screen.fill((background))
         player.draw(self.screen)
         for i in game.enemies:
             if i.health > 0:
