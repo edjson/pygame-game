@@ -25,7 +25,7 @@ Install all packages in requirements.txt:
 pip install -r requirements.txt
 ```
 
-To set your Groq API key in the terminal:
+To set your Groq API key replace "api key" in ai/llm.py or in the terminal:
 ```bash
 export GROQ_API_KEY=your_key_here
 ```
