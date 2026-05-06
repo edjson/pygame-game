@@ -50,7 +50,7 @@ class Music:
             print(f"[music] play failed: {e}")
 
     def set_volume(self):
-        """gets the volume level from settings"""
+        """applies current volume level from settings go music"""
         try:
             pygame.mixer.music.set_volume(settings.volume / 100)
         except pygame.error as e:
