@@ -110,7 +110,7 @@ while state != "quit":
     if new_state == "quit":
         state = "quit"
 
-    # main → playing
+    # main -> playing
     if state == "main" and new_state == "playing":
         music.play()
         menus["main"].hide()
@@ -121,7 +121,7 @@ while state != "quit":
 
     if new_state != state:
         
-        # main → simulation
+        # main -> simulation
         if state == "main" and new_state == "simulation":
             simulation = Simulation(profile_name=settings.profile_name)
             menus["main"].hide()
@@ -129,7 +129,7 @@ while state != "quit":
             state = "simulation"
             continue
 
-        # main → tutorial
+        # main -> tutorial
         if state == "main" and new_state == "tutorial":
             music.play()
             tutorial = Tutorial(profile_name=settings.profile_name)
@@ -139,7 +139,7 @@ while state != "quit":
             state = "tutorial"
             continue
 
-        # playing → pause
+        # playing -> pause
         if state == "playing" and new_state == "pause":
             music.pause()
             paused_from = "playing"
@@ -147,7 +147,7 @@ while state != "quit":
             state = "pause"
             continue
 
-        # input_menu → main
+        # input_menu -> main
         if state == "input_menu" and new_state == "main":
             build_types()
             profile_name, saved_profile = init_profile()
@@ -157,7 +157,7 @@ while state != "quit":
             state = "main"
             continue
 
-        # tutorial → pause
+        # tutorial -> pause
         if state == "tutorial" and new_state == "pause":
             music.pause()
             paused_from = "tutorial"
@@ -165,7 +165,7 @@ while state != "quit":
             state = "pause"
             continue
 
-        # pause → playing
+        # pause -> playing
         if state == "pause" and new_state == "playing":
             paused_from = None
             music.unpause()
@@ -173,7 +173,7 @@ while state != "quit":
             state = "playing"
             continue
 
-        # pause → tutorial
+        # pause -> tutorial
         if state == "pause" and new_state == "tutorial":
             paused_from = None
             music.unpause()
@@ -181,7 +181,7 @@ while state != "quit":
             state = "tutorial"
             continue
 
-        # main → settings
+        # main -> settings
         if state == "main" and new_state == "settings":
             back_state = "main"
             menus["main"].hide()
@@ -189,7 +189,7 @@ while state != "quit":
             state = "settings"
             continue
 
-        # game_over → settings
+        # game_over -> settings
         if state == "game_over" and new_state == "settings":
             back_state = "game_over"
             menus["game_over"].hide()
@@ -197,7 +197,7 @@ while state != "quit":
             state = "settings"
             continue
 
-        # pause → settings
+        # pause -> settings
         if state == "pause" and new_state == "settings":
             back_state = "pause"
             menus["pause"].hide()
@@ -205,7 +205,7 @@ while state != "quit":
             state = "settings"
             continue
 
-        # pause → main 
+        # pause -> main 
         if state == "pause" and new_state == "main":
             music.stop()
             paused_from = None
@@ -214,7 +214,7 @@ while state != "quit":
             state = "main"
             continue
 
-        # settings → back
+        # settings -> back
         if state == "settings" and new_state == "back":
             music.set_volume()  
             menus["settings"].hide()
@@ -230,7 +230,7 @@ while state != "quit":
             back_state = None
             continue
 
-        # playing → game_over
+        # playing -> game_over
         if state == "playing" and new_state == "game_over":
             music.stop()
             try:
@@ -241,7 +241,7 @@ while state != "quit":
             state = "game_over"
             continue
 
-        # tutorial → game_over
+        # tutorial -> game_over
         if state == "tutorial" and new_state == "game_over":
             music.stop()
             try:
@@ -261,14 +261,14 @@ while state != "quit":
             state = "game_over"
             continue
 
-        # game_over → main
+        # game_over -> main
         if state == "game_over" and new_state == "main":
             menus["game_over"].hide()
             menus["main"].show()
             state = "main"
             continue
 
-        # game_over → restart  (restart music from beginning)
+        # game_over -> restart  (restart music from beginning)
         if state == "game_over" and new_state == "restart":
             music.restart()
             menus["game_over"].hide()
@@ -276,7 +276,7 @@ while state != "quit":
             state = "playing"
             continue
 
-        # level → playing / tutorial
+        # level -> playing / tutorial
         if state == "level" and new_state == "playing":
             menus["level"].hide()
             if last_mode == "tutorial" and menus["level"].last_chosen:
@@ -290,7 +290,7 @@ while state != "quit":
             state = "tutorial"
             continue
 
-        # simulation ↔ pause
+        # simulation <-> pause
         if state == "simulation" and new_state == "pause":
             paused_from = "simulation"
             menus["pause"].show()

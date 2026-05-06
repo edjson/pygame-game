@@ -12,9 +12,9 @@ A top-down shooter where enemies learn from how you play. After each session the
 
 ## How It Works
 
-Every run logs frame-by-frame data — movement, accuracy, evasion, upgrade choices, and positioning. After the game ends this log is sent to an LLM (Groq / LLaMA 3.3) which produces a structured player profile. That profile is merged with previous sessions using exponential smoothing and saved to disk. The next time you play, enemies spawn with scaled stats and use a counter-strategy tailored to your profile.
+Every run logs frame-by-frame data — movement, accuracy, evasion, upgrade choices, and positioning. After the game ends this log is sent to an LLM (Groq / LLaMA 3.3) which produces a structured player profile. That profile is merged with previous sessions using exponential smoothing and saved to disk at a 70 / 30 ratio. The next time you play, enemies spawn with scaled stats and use a counter-strategy tailored to your profile.
 
-During a run, a lightweight version of the same analysis runs live every time a stage clears (from stage 3+), so enemies start adapting mid-session without waiting for game-over.
+During a run, a lightweight version of the same analysis runs live every time a stage clears (from stage 3+), so enemies start adapting mid-session without waiting for game-over. This was implemented because at start the enemy will not know the player. This way having the 3 stages info gathering, the enemy would be better informed. 
 
 ---
 
@@ -25,7 +25,7 @@ Install all packages in requirements.txt:
 pip install -r requirements.txt
 ```
 
-Set your Groq API key:
+To set your Groq API key in the terminal:
 ```bash
 export GROQ_API_KEY=your_key_here
 ```
@@ -60,9 +60,9 @@ python -m ai.train --episodes 500 --save-every 50
 - **Headless simulation training** — `sim.py` and `train.py` run the full game loop without a display, supporting both single-process and multiprocessing modes
 - **Fine-tuning agent** — `FineTuneAgent` fine-tunes a pre-trained base policy against a specific profile using a KL-divergence penalty to limit behavioural drift
 - **Tutorial mode** — guided WASD + mouse-1 tutorial that feeds into the same logging and profiling pipeline; tutorial enemy is a stationary dud with no AI
-- **Simulation mode** — watch an AI player (driven by `AIPlayer`) face the enemy AI so you can observe adaptation without playing
+- **Simulation mode** — watch an AI player (driven by `AIPlayer`) face the enemy AI so you can observe adaptation without playing (does not train model directly just to analyze AI Player)
 - **Profile merging** — each session is exponentially smoothed (70/30) with the prior profile so the enemy adapts gradually across multiple runs
-- **Trajectory lines** — optional trace mode draws projectile trajectory lines from current position forward
+- **Trajectory lines** — optional trace mode draws projectile trajectory lines from current position forward (for prediction observatons)
 
 ---
 
@@ -159,7 +159,7 @@ Weights are saved to `ai/weights/weights.pt`.
 To populate the replays directory with hand-crafted archetypes for testing:
 
 ```bash
-python seed_profiles.py
+python generate_profiles.py
 ```
 
 Included archetypes: `the_camper`, `the_rusher`, `the_kiter`, `the_waller`, `the_sniper`, `the_sprayer`, `the_survivor`, `the_random`, `the_flanker`, `the_balanced`, `the_tank_killer`, `the_glass_cannon_hunter`.

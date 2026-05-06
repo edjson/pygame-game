@@ -1,7 +1,7 @@
 import json
 import os
 from groq import Groq
-
+from dotenv import load_dotenv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY", "api key"))
