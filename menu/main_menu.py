@@ -39,7 +39,7 @@ class MainMenu:
         )
         self.hide()
 
-    def handle_event(self, event) -> str:
+    def handle_event(self, event):
         """Return the destination state string on button press, or None."""
         if event.type == pygame_gui.UI_BUTTON_PRESSED:
             if event.ui_element == self.start_button:      return "playing"

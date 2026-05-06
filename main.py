@@ -2,7 +2,7 @@ import pygame
 import pygame_gui
 import settings
 from settings import (screen_height, screen_width, title, fps, volume, font_big, font_small, cx, cy,
-                      text_color, text_passive, input_color)
+                      text_color, text_passive, input_color, background)
 from menu.main_menu import MainMenu
 from menu.level_up_menu import LevelUpMenu
 from assets.assets import load_assets
@@ -86,7 +86,7 @@ loader_thread.start()
 
 def draw_loading_screen(progress_anim: float):
     """Draws a loading screen while the loader runs."""
-    screen.fill((20, 20, 20))
+    screen.fill((background))
 
     title_surf = font_big.render(title, True, text_color)
     screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 80)))
@@ -98,8 +98,8 @@ def draw_loading_screen(progress_anim: float):
     bar_x  = cx - bar_w // 2
     bar_y  = cy + 40
     fill_w = int((0.5 + 0.5 * __import__('math').sin(progress_anim * 3.14)) * bar_w)
-    pygame.draw.rect(screen, (60, 60, 60),  (bar_x, bar_y, bar_w, bar_h), border_radius=2)
-    pygame.draw.rect(screen, (180, 180, 180), (bar_x, bar_y, fill_w, bar_h), border_radius=2)
+    pygame.draw.rect(screen, (text_color),  (bar_x, bar_y, bar_w, bar_h), border_radius=2)
+    pygame.draw.rect(screen, (text_passive), (bar_x, bar_y, fill_w, bar_h), border_radius=2)
 
     pygame.display.flip()
 

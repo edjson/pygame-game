@@ -14,7 +14,7 @@ total_actions = 9
 layers        = 512
 gamma         = 0.9
 learning_rate = 0.001
-batch_size    = 512      
+batch_size    = 64      
 target_sync   = 500
 explore_start = 1.0
 explore_end   = 0.15     
@@ -40,21 +40,23 @@ class DQNagent:
 
     def __init__(self, device: str | None = None):
         """Initialise online/target networks, optimizer, replay buffer, and epsilon schedule."""
-        self.device    = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
-        self.online    = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
-        self.target    = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
+        self.device     = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.online     = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
+        self.target     = LSTMDQNNet(input_vector, total_actions, layers).to(self.device)
         self.target.load_state_dict(self.online.state_dict())
         self.target.eval()
-        self.optimizer = optim.Adam(self.online.parameters(), lr=learning_rate)
-        self.buffer    = ReplayBuffer()
-        self.epsilon   = explore_start
-        self.steps     = 0
-        self.hidden    = {}
+        self.optimizer  = optim.Adam(self.online.parameters(), lr=learning_rate)
+        self.buffer     = ReplayBuffer()
+        self.epsilon    = explore_start
+        self.steps      = 0
+        self.hidden     = {}
+        self.episode_id =0
 
     def reset_hidden(self, enemy_id=None):
         """Clear the LSTM hidden state for one enemy, or all enemies if no id is given."""
         if enemy_id is None:
             self.hidden = {}
+            self.episode_id += 1
         else:
             self.hidden.pop(enemy_id, None)
 
@@ -79,9 +81,9 @@ class DQNagent:
             return dx / length, dy / length
         return 0.0, 0.0
 
-    def push(self, state, action, reward, next_state, done):
+    def push(self, enemy_id, state, action, reward, next_state, done):
         """Store a transition, increment step counter, and sync target network every target_sync steps."""
-        self.buffer.push(state, action, reward, next_state, done)
+        self.buffer.push(enemy_id, self.episode_id, state, action, reward, next_state, done)
         self.steps += 1
         if self.steps % target_sync == 0:
             self.target.load_state_dict(self.online.state_dict())
@@ -98,12 +100,12 @@ class DQNagent:
         ns = torch.tensor(next_states, dtype=torch.float32, device=self.device)
         d  = torch.tensor(dones,       dtype=torch.float32, device=self.device)
 
-        q_vals, _, _ = self.online(s)
-        q_vals       = q_vals.gather(1, a.unsqueeze(1)).squeeze(1)
+        q_vals, _, _ = self.online(s, return_sequence=True)
+        q_vals       = q_vals.gather(2, a.unsqueeze(2)).squeeze(2)
 
         with torch.no_grad():
-            next_q, _, _ = self.target(ns)
-            target       = r + gamma * next_q.max(dim=1).values * (1 - d)
+            next_q, _, _ = self.target(ns, return_sequence=True)
+            target       = r + gamma * next_q.max(dim=2).values * (1 - d)
 
         loss = nn.functional.mse_loss(q_vals, target)
         self.optimizer.zero_grad()
@@ -119,10 +121,11 @@ class DQNagent:
     def save(self, path: str = "ai/weights/weights.pt"):
         """Checkpoint online/target weights, epsilon, and step count to disk."""
         torch.save({
-            "online":  self.online.state_dict(),
-            "target":  self.target.state_dict(),
-            "epsilon": self.epsilon,
-            "steps":   self.steps,
+            "online":     self.online.state_dict(),
+            "target":     self.target.state_dict(),
+            "epsilon":    self.epsilon,
+            "steps":      self.steps,
+            "episode_id": self.episode_id
         }, path)
 
     def load(self, path: str = "ai/weights/weights.pt"):
@@ -130,8 +133,9 @@ class DQNagent:
         ck = torch.load(path, map_location=self.device, weights_only=True)
         self.online.load_state_dict(ck["online"])
         self.target.load_state_dict(ck["target"])
-        self.epsilon = ck.get("epsilon", explore_end)
-        self.steps   = ck.get("steps", 0)
+        self.epsilon    = ck.get("epsilon", explore_end)
+        self.steps      = ck.get("steps", 0)
+        self.episode_id = ck.get("episode_id", 0)
 
 
 def build_state(enemy, player, projectile, allies, profile=None):
@@ -212,23 +216,23 @@ def compute_rewards(enemy, player, allies, prev_player_health, curr_player_healt
         gaps         = [angles[i + 1] - angles[i] for i in range(len(angles) - 1)]
         gaps.append(angles[0] + 2 * math.pi - angles[-1])
         spread_bonus = 1 - (np.std(gaps) / math.pi)
-        reward      += spread_bonus * 0.1
+        reward      += spread_bonus * 0.3
 
     # Penalty for clustering with allies
     for a in allies:
         if a is not enemy and a.health > 0:
             if enemy.pos.distance_to(a.pos) < 25:
-                reward -= 0.5
+                reward -= 1.5
 
     # Wall penalties
     if enemy.pos.x < wall_penalty_margin:
-        reward -= 0.5 * (wall_penalty_margin - enemy.pos.x) / wall_penalty_margin
+        reward -= 1.5 * (wall_penalty_margin - enemy.pos.x) / wall_penalty_margin
     if enemy.pos.x > screen_width - wall_penalty_margin:
-        reward -= 0.5 * (enemy.pos.x - (screen_width - wall_penalty_margin)) / wall_penalty_margin
+        reward -= 1.5 * (enemy.pos.x - (screen_width - wall_penalty_margin)) / wall_penalty_margin
     if enemy.pos.y < wall_penalty_margin:
-        reward -= 0.5 * (wall_penalty_margin - enemy.pos.y) / wall_penalty_margin
+        reward -= 1.5 * (wall_penalty_margin - enemy.pos.y) / wall_penalty_margin
     if enemy.pos.y > screen_height - wall_penalty_margin:
-        reward -= 0.5 * (enemy.pos.y - (screen_height - wall_penalty_margin)) / wall_penalty_margin
+        reward -= 1.5 * (enemy.pos.y - (screen_height - wall_penalty_margin)) / wall_penalty_margin
 
     if hit_by_projectile:
         reward -= 1.0

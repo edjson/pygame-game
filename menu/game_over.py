@@ -1,7 +1,7 @@
 import pygame
 import pygame_gui
 from settings import (screen_height, screen_width, text_color, cx, cy, background,
-                      button_height, button_width, font_big, font_small, thirds)
+                      button_height, button_width, font_big, font_small, thirds, transparent)
 
 
 class GameOverMenu:
@@ -39,7 +39,7 @@ class GameOverMenu:
     def draw(self, screen, manager, survived_time: float = 0.0):
         """Draw a semi-transparent overlay, GAME OVER title, survival time, and UI buttons."""
         overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))
+        overlay.fill((transparent))
         screen.blit(overlay, (0, 0))
         label      = font_big.render("GAME OVER", True, "red")
         time_label = font_small.render(f"Survived: {survived_time:.1f}s", True, text_color)

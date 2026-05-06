@@ -1,7 +1,7 @@
 import pygame
 import pygame_gui
 import random
-from settings import cx, cy, button_height, button_width, font_big, text_color, thirds
+from settings import cx, cy, button_height, button_width, font_big, text_color, thirds, transparent
 
 buffs = ["Speed", "Max Health", "Health Regen", "Damage", "Heal"]
 
@@ -44,6 +44,7 @@ class LevelUpMenu:
 
     def draw(self, screen, manager):
         """Draw the LEVEL UP title and upgrade buttons."""
+        screen.fill(transparent)
         label = font_big.render("LEVEL UP", True, text_color)
         screen.blit(label, label.get_rect(center=(cx, thirds)))
         manager.draw_ui(screen)

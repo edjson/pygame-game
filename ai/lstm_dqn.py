@@ -33,15 +33,21 @@ class LSTMDQNNet(nn.Module):
             nn.Linear(hidden, action_dim),
         )
         
-    def forward(self, x, hidden=None):
+    def forward(self, x, hidden=None, return_sequence=False):
         """Encode x, run LSTM, and return (Q-values, lead probability, hidden state) for the last timestep."""
         if x.dim() == 2:
             x = x.unsqueeze(1)   
         enc = self.encoder(x)    
         out, hidden = self.lstm(enc, hidden)
-        last = out[:, -1, :]         
-        q = self.head(last) 
-        lead = self.head_lead(last)
+
+        if return_sequence:
+            q    = self.head(out)
+            lead = self.head_lead(out)
+        else:
+            last = out[:, -1, :]         
+            q = self.head(last) 
+            lead = self.head_lead(last)
+
         return q, lead, hidden
     
     def init_hidden(self, batch_size: int = 1, device: str = "cpu"):

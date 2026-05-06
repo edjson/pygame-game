@@ -134,7 +134,8 @@ def train_single(enemy_agent, profiles):
             for i in range(n):
                 if i < len(states) and i < len(next_states):
                     if i < len(sim.enemies()) and (sim.enemies()[i].health > 0 or dones[i]):
-                        enemy_agent.push(states[i], actions[i][0], rewards[i], next_states[i], dones[i])
+                        enemy_id = sim.enemies()[i].enemy_id if i < len(sim.enemies()) else i
+                        enemy_agent.push(enemy_id, states[i], actions[i][0], rewards[i], next_states[i], dones[i])
                 if i < len(rewards) and i < len(env_rewards[env_i]):
                     env_rewards[env_i][i] += rewards[i]
 
@@ -144,6 +145,9 @@ def train_single(enemy_agent, profiles):
             if not info["player_alive"] or env_steps[env_i] >= max_steps:
                 episode += 1
                 env_steps[env_i] = 0
+                for e in sim.enemies():
+                    enemy_agent.buffer.flush(e.enemy_id, enemy_agent.episode_id)
+                enemy_agent.reset_hidden()
                 enemy_agent.decay_epsilon()
                 mean_r = np.mean(env_rewards[env_i]) if env_rewards[env_i] else 0.0
                 ep_rewards_log.append(mean_r)
@@ -220,8 +224,9 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
             for i in range(actual_n):
                 if i < len(cur_states) and i < len(next_states) and i < len(env_actions):
                     if i < len(sim.enemies()) and (sim.enemies()[i].health > 0 or dones[i]):
+                        enemy_id = sim.enemies()[i].enemy_id if i < len(sim.enemies()) else i
                         experiences.append((
-                            cur_states[i], env_actions[i][0],
+                            enemy_id, cur_states[i], env_actions[i][0],
                             step_rewards[i], next_states[i], dones[i],
                         ))
                 if i < len(step_rewards):
@@ -331,6 +336,7 @@ def train_multi(enemy_agent, profiles):
 
                 for mean_r in result["episode_results"]:
                     episode += 1
+                    enemy_agent.reset_hidden()
                     enemy_agent.decay_epsilon()
                     ep_rewards_log.append(mean_r)
 

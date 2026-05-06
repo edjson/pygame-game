@@ -42,15 +42,16 @@ fire_rate                = 0.8
 min_cooldown             = 50
 max_cooldown             = 1000
 profile_name             = "default_profile"   
+wall_border              = 40
 
 # enemy
 enemy_projectile_color   = "magenta"
-enemies_count_rate       = 1.2
+enemies_count_rate       = 1.05
 margin                   = 50
-spawn_decay_rate         = 0.85
-min_spawn_delay          = 0.2
+spawn_decay_rate         = 0.05
+min_spawn_delay          = 0.5
 current_spawn_delay      = 3
-wall_penalty_margin      = 80 
+wall_penalty_margin      = 50
 detection_radius         = 300
 
 # game variables

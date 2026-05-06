@@ -1,7 +1,7 @@
 import pygame
 import pygame_gui
 from settings import (cx, cy, screen_height, screen_width, button_height, button_width,
-                      font_big, font_small, text_color, thirds)
+                      font_big, font_small, text_color, thirds, transparent)
 
 
 class PauseMenu:
@@ -38,7 +38,7 @@ class PauseMenu:
     def draw(self, screen, manager):
         """Draw a semi-transparent overlay, PAUSED title, and UI buttons."""
         overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 160))
+        overlay.fill((transparent))
         screen.blit(overlay, (0, 0))
         label = font_big.render("PAUSED", True, text_color)
         screen.blit(label, label.get_rect(center=(cx, thirds)))

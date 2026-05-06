@@ -13,7 +13,7 @@ class Projectile:
 
         # sprites
         originalImage = pygame.image.load(sprite).convert_alpha()
-        diameter = self.radius * 2
+        diameter = self.radius * 3
         self.image = pygame.transform.scale(originalImage, (diameter, diameter))
         self.rect = self.image.get_rect(center=(x, y))
 

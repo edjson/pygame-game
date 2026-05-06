@@ -4,7 +4,7 @@ import random
 import math
 from entities.projections import Projectile
 from settings import (screen_height, screen_width, margin, bar_h, bar_w, color_health_bar,
-                      color_health_bg, projectile_speeds, enemy_projectile_color)
+                      color_health_bg, projectile_speeds, wall_border)
 from ai.dqn_enemy import build_state
 import os
 from ai.dqn_enemy import DQNagent
@@ -128,8 +128,8 @@ class Enemy:
         self.vel    = pygame.Vector2(dx, dy) * self.speed
         self.pos.x += dx * self.speed * dt
         self.pos.y += dy * self.speed * dt
-        self.pos.x  = max(self.radius, min(screen_width  - self.radius, self.pos.x))
-        self.pos.y  = max(self.radius, min(screen_height - self.radius, self.pos.y))
+        self.pos.x  = max(self.radius + wall_border, min(screen_width  - self.radius - wall_border, self.pos.x))
+        self.pos.y  = max(self.radius + wall_border, min(screen_height - self.radius - wall_border, self.pos.y))
 
         if self.attack_cooldown > 0:
             self.attack_cooldown -= dt
