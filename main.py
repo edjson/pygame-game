@@ -88,13 +88,16 @@ menus = {
     "level":      LevelUpMenu(manager),
     "input_menu": InputMenu(manager)
 }
-menus["input_menu"].show()
-state       = "input_menu"
+
+build_types()
+profile_name, saved_profile = init_profile()
+game = Game(profile_name=profile_name)
+menus["main"].show()
+state       = "main"
 dt          = 0
 back_state  = None
 paused_from = None
 last_mode   = "playing"
-game = None
 # Transisiton handler
 while state != "quit":
 
