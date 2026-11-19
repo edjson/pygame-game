@@ -102,8 +102,36 @@ class Simulation:
         self.max_steps    = max_steps
         self.profile_name = profile_name
         self.step_count   = 0
+        self._enemies     = []   # this env's own enemies (see _bound)
+
+    # Enemy() registers itself in the module-level entities.enemy.enemies list,
+    # and the game code reads that list directly. Several Simulations in one
+    # process would therefore share (and clobber) one enemy list. We keep a
+    # private list per env and swap it into the global slot for the duration
+    # of each reset()/step() call.
+    def _bind(self):
+        _global_enemies[:] = self._enemies
+
+    def _unbind(self):
+        self._enemies = list(_global_enemies)
+        _global_enemies.clear()
 
     def reset(self):
+        self._enemies = []
+        self._bind()
+        try:
+            return self._reset()
+        finally:
+            self._unbind()
+
+    def step(self, actions: list, dt: float = 1 / 60.0):
+        self._bind()
+        try:
+            return self._step(actions, dt)
+        finally:
+            self._unbind()
+
+    def _reset(self):
         """Rebuild player, enemies, and projectile lists; return initial per-enemy state vectors."""
         profile_path = os.path.join("replays", self.profile_name, "profile.json") if self.profile_name else None
         if profile_path and os.path.exists(profile_path):
@@ -139,8 +167,8 @@ class Simulation:
         return self._get_states()
 
     def enemies(self):
-        """Return the live global enemy list."""
-        return _global_enemies
+        """Return this env's enemy list."""
+        return self._enemies
 
     def _spawn_enemies(self, count):
         """Spawn count enemies of random type at random edge positions."""
@@ -156,7 +184,7 @@ class Simulation:
         upgrade = self.player.pick_upgrade() if hasattr(self.player, "pick_upgrade") else random.choice(all_buffs)
         apply_buff(self.player, upgrade)
 
-    def step(self, actions: list, dt: float = 1 / 60.0):
+    def _step(self, actions: list, dt: float = 1 / 60.0):
         self.step_count += 1
 
         alive_enemies = [e for e in _global_enemies if e.health > 0]
