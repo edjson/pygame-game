@@ -232,11 +232,14 @@ def train_single(enemy_agent, profiles, meter):
                 env_rewards[env_i].append(0.0)
             while len(states) < n:
                 states.append(np.zeros(30, dtype=np.float32))
+            # Dead enemies stay in the list (zero state, -5, done=True every step) until the episode
+            # ends; only enemies alive before this step get an action, a transition and reward.
+            alive = [e.health > 0 for e in sim.enemies()]
 
             with timed(meter, "act"):
                 actions = []
                 for i in range(n):
-                    if i < len(states) and sim.enemies()[i].health > 0:
+                    if i < len(states) and alive[i]:
                         action, lead_scale = enemy_agent.select_action(
                             states[i], enemy_id=sim.enemies()[i].enemy_id
                         )
@@ -252,11 +255,12 @@ def train_single(enemy_agent, profiles, meter):
 
             with timed(meter, "other"):
                 for i in range(n):
+                    if not alive[i]:            # died in an earlier step: no transition, no reward
+                        continue
                     if i < len(states) and i < len(next_states):
-                        if i < len(sim.enemies()) and (sim.enemies()[i].health > 0 or dones[i]):
-                            enemy_id = sim.enemies()[i].enemy_id
-                            enemy_agent.push(enemy_id, states[i], actions[i][0], rewards[i], next_states[i], dones[i])
-                            meter.counts["transitions"] += 1
+                        enemy_id = sim.enemies()[i].enemy_id
+                        enemy_agent.push(enemy_id, states[i], actions[i][0], rewards[i], next_states[i], dones[i])
+                        meter.counts["transitions"] += 1
                     if i < len(rewards) and i < len(env_rewards[env_i]):
                         env_rewards[env_i][i] += rewards[i]
 
@@ -347,17 +351,19 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
             actual_n = len(sim.enemies())
             while len(env_actions) < actual_n:
                 env_actions.append((0, 0.5))
+            alive = [e.health > 0 for e in sim.enemies()]   # the ones the learner picked an action for
 
             next_states, step_rewards, dones, info = sim.step(env_actions, dt=sim_dt)
 
             for i in range(actual_n):
+                if not alive[i]:                # died in an earlier step: no transition, no reward
+                    continue
                 if i < len(cur_states) and i < len(next_states) and i < len(env_actions):
-                    if i < len(sim.enemies()) and (sim.enemies()[i].health > 0 or dones[i]):
-                        enemy_id = sim.enemies()[i].enemy_id
-                        experiences.append((
-                            enemy_id, cur_states[i], env_actions[i][0],
-                            step_rewards[i], next_states[i], dones[i],
-                        ))
+                    enemy_id = sim.enemies()[i].enemy_id
+                    experiences.append((
+                        enemy_id, cur_states[i], env_actions[i][0],
+                        step_rewards[i], next_states[i], dones[i],
+                    ))
                 if i < len(step_rewards):
                     while len(rewards[env_i]) <= i:
                         rewards[env_i].append(0.0)
