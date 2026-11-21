@@ -53,6 +53,7 @@ parser.add_argument("--mode",         choices=["single", "multi"], default="sing
 parser.add_argument("--max-steps",    type=int, default=3000, help="sim steps per episode")
 parser.add_argument("--time-limit",   type=float, default=0, help="stop after N seconds (0 = no limit)")
 parser.add_argument("--fresh",        action="store_true", help="ignore existing weights, start from scratch")
+parser.add_argument("--epsilon",      type=float, default=None, help="hold exploration at this value for the whole run (no decay)")
 parser.add_argument("--seed",         type=int, default=0)
 parser.add_argument("--device",       default=None, help="cuda / cpu (default: cuda if available)")
 parser.add_argument("--run-dir",      default=None, help="write metrics.jsonl / summary.json / weights here")
@@ -269,7 +270,8 @@ def train_single(enemy_agent, profiles, meter):
                     for e in sim.enemies():
                         enemy_agent.buffer.flush(e.enemy_id, enemy_agent.episode_id)
                     enemy_agent.reset_hidden()
-                    enemy_agent.decay_epsilon()
+                    if args.epsilon is None:
+                        enemy_agent.decay_epsilon()
                     ep_rewards_log.append(np.mean(env_rewards[env_i]) if env_rewards[env_i] else 0.0)
                     env_profiles[env_i] = pick_profile()
                     sim.profile_name    = env_profiles[env_i][0]
@@ -480,7 +482,8 @@ def train_multi(enemy_agent, profiles, meter):
                         episode += 1
                         meter.counts["episodes"] += 1
                         enemy_agent.reset_hidden()
-                        enemy_agent.decay_epsilon()
+                        if args.epsilon is None:
+                            enemy_agent.decay_epsilon()
                         ep_rewards_log.append(mean_r)
 
                     worker_states[w]    = result["states"]
@@ -540,6 +543,9 @@ def train():
         print(f"[weights] loaded {args.weights_in}")
     else:
         print("[weights] starting from scratch")
+    if args.epsilon is not None:
+        enemy_agent.epsilon = args.epsilon
+        print(f"[epsilon] held at {args.epsilon} (no decay)")
 
     profiles = discover_profiles()
     print(f"[profiles] {len(profiles)} loaded: {[p[0] for p in profiles]}")

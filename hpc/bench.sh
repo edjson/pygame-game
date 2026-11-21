@@ -2,12 +2,15 @@
 # Strong-scaling sweep: fixed 128 envs, vary worker processes. Called by the sbatch files.
 #   bench.sh <device> <out_root>
 # Two phases per worker count:
-#   simonly  - learning disabled -> measures pure parallel simulation throughput
+#   simonly  - learning disabled, epsilon held at $EPS (default 0.15 = the training floor,
+#              so ~85% of actions run the network) -> rollout (sim + inference) throughput
 #   full     - real training (sim + inference + learner) -> end-to-end throughput
+#              (epsilon decays from 1.0 as in a fresh run, so most actions are still random)
 set -uo pipefail
 DEVICE=$1; OUT=$2
 ENVS=${ENVS:-128}
 SIM_T=${SIM_T:-180}; FULL_T=${FULL_T:-300}
+EPS=${EPS:-0.15}
 NCPU=${SLURM_CPUS_PER_TASK:-$(nproc)}
 WORKERS=${WORKERS:-"1 2 4 8 16 32 64 128"}
 mkdir -p "$OUT"
@@ -18,7 +21,7 @@ for W in $WORKERS; do
   [ "$W" -ge "$NCPU" ] && { echo "skip W=$W (only $NCPU cpus)"; continue; }
   echo "=== $DEVICE workers=$W ==="
   python -m ai.train --mode multi --workers $W --envs $ENVS --fresh --seed 0 \
-      --device $DEVICE --warmup-eps 1000000000 --time-limit $SIM_T \
+      --device $DEVICE --warmup-eps 1000000000 --epsilon $EPS --time-limit $SIM_T \
       --run-dir "$OUT/simonly_w$W" --save-every 1000000000
   python -m ai.train --mode multi --workers $W --envs $ENVS --fresh --seed 0 \
       --device $DEVICE --warmup-eps 20 --max-steps 1000 --time-limit $FULL_T \
