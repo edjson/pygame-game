@@ -271,9 +271,11 @@ def train_single(enemy_agent, profiles, meter):
                     episode += 1
                     meter.counts["episodes"] += 1
                     env_steps[env_i] = 0
+                    # Only this env's enemies: reset_hidden() with no id would also wipe the other envs'
+                    # mid-episode LSTM state and bump episode_id, stranding their staged sequences.
                     for e in sim.enemies():
                         enemy_agent.buffer.flush(e.enemy_id, enemy_agent.episode_id)
-                    enemy_agent.reset_hidden()
+                        enemy_agent.reset_hidden(e.enemy_id)
                     if args.epsilon is None:
                         enemy_agent.decay_epsilon()
                     ep_rewards_log.append(np.mean(env_rewards[env_i]) if env_rewards[env_i] else 0.0)
@@ -343,6 +345,7 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
         actions_per_env = msg
         experiences     = []
         episode_results = []
+        ended_ids       = []
 
         for env_i, sim in enumerate(envs):
             env_actions = actions_per_env[env_i]
@@ -375,6 +378,7 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
             if not info["player_alive"] or steps[env_i] >= max_steps:
                 mean_r = float(np.mean(rewards[env_i])) if rewards[env_i] else 0.0
                 episode_results.append(mean_r)
+                ended_ids       += [e.enemy_id for e in sim.enemies()]   # before reset() replaces them
                 steps[env_i]     = 0
                 sim.profile_name = pick_profile()[0]
                 states[env_i]    = sim.reset()
@@ -383,6 +387,7 @@ def worker_fn(worker_id, env_ids, profiles, action_queue, experience_queue, max_
         experience_queue.put({
             "experiences":     experiences,
             "episode_results": episode_results,
+            "ended_ids":       ended_ids,
             "states":          [states[i] for i in range(n)],
             "enemy_counts":    [len(sim.enemies()) for sim in envs],
             "enemy_ids":       [[e.enemy_id for e in sim.enemies()] for sim in envs],
@@ -484,10 +489,13 @@ def train_multi(enemy_agent, profiles, meter):
                     meter.counts["env_steps"]   += result["n_env_steps"]
                     worker_busy += result["busy_s"]
 
+                    # enemies of this worker's envs that ended an episode; the other envs keep their state
+                    for eid in result["ended_ids"]:
+                        enemy_agent.buffer.flush(eid, enemy_agent.episode_id)
+                        enemy_agent.reset_hidden(eid)
                     for mean_r in result["episode_results"]:
                         episode += 1
                         meter.counts["episodes"] += 1
-                        enemy_agent.reset_hidden()
                         if args.epsilon is None:
                             enemy_agent.decay_epsilon()
                         ep_rewards_log.append(mean_r)
