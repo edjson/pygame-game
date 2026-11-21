@@ -73,6 +73,35 @@ class DQNagent:
             lead_scale = float(lead.item())
             return action, lead_scale
 
+    def select_actions(self, states, enemy_ids):
+        """Epsilon-greedy (action, lead) for many enemies: one forward pass, one GPU->CPU copy.
+
+        Training calls this once per step with every live enemy. Each enemy's LSTM state
+        advances on every call, including steps where exploration picks a random action, so
+        its memory has no gaps (select_action skips the network on random steps). The hidden
+        dict is rebuilt from this batch: enemies left out are dead or finished, and their
+        entries would otherwise keep earlier batch tensors alive (each entry is a view into one).
+        """
+        if not enemy_ids:
+            self.hidden = {}
+            return []
+        with torch.no_grad():
+            s    = torch.from_numpy(np.asarray(states, dtype=np.float32)).to(self.device)   # (B, 30)
+            zero = torch.zeros(1, 1, self.online.hidden_size, device=self.device)
+            prev = [self.hidden.get(eid, (zero, zero)) for eid in enemy_ids]
+            h0   = torch.cat([p[0] for p in prev], dim=1)                                  # (1, B, H)
+            c0   = torch.cat([p[1] for p in prev], dim=1)
+            q, lead, (h1, c1) = self.online(s, (h0, c0))
+            out  = torch.stack([q.argmax(dim=1).float(), lead[:, 0]], dim=1).cpu().numpy()  # the one sync
+        self.hidden = {eid: (h1[:, i:i + 1], c1[:, i:i + 1]) for i, eid in enumerate(enemy_ids)}
+        picks = []
+        for i in range(len(enemy_ids)):
+            if random.random() < self.epsilon:
+                picks.append((random.randrange(total_actions), 0.5))
+            else:
+                picks.append((int(out[i, 0]), float(out[i, 1])))
+        return picks
+
     def action_to_direction(self, action):
         """Convert a discrete action index to a unit (dx, dy) direction vector."""
         dx, dy = movement[action]
