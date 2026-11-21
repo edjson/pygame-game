@@ -54,7 +54,7 @@ def run_once(n, w, run_dir, args):
         if os.path.exists(os.path.join(run_dir, name)):
             os.remove(os.path.join(run_dir, name))
     cmd = [sys.executable, "-m", "ai.train", "--mode", args.mode, "--workers", str(w), "--envs", str(n),
-           "--fresh", "--warmup-eps", "1000000000", "--epsilon", str(args.epsilon),
+           "--fresh", "--warmup-eps", "1000000000", "--episodes", "1000000000", "--epsilon", str(args.epsilon),
            "--time-limit", str(args.warmup + args.seconds), "--log-interval", "1",
            "--save-every", "1000000000", "--run-dir", run_dir, "--device", args.device,
            "--weights-out", os.devnull]                  # learning is off, so the checkpoint is just the init
