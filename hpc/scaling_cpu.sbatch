@@ -5,7 +5,7 @@
 #SBATCH --partition=short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=56
 #SBATCH --mem=64G
 #SBATCH --time=03:00:00
 #SBATCH --output=logs/%x-%j.out
