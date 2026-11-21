@@ -225,28 +225,34 @@ def train_single(enemy_agent, profiles, meter):
                 bar_format="{l_bar}{bar:30}{r_bar}", mininterval=5)
 
     while episode < n_episodes and not time_up(meter):
-        for env_i, sim in enumerate(envs):
-            states = env_states[env_i]
-            n      = len(sim.enemies())
-            while len(env_rewards[env_i]) < n:
-                env_rewards[env_i].append(0.0)
-            while len(states) < n:
-                states.append(np.zeros(30, dtype=np.float32))
-            # Dead enemies stay in the list (zero state, -5, done=True every step) until the episode
-            # ends; only enemies alive before this step get an action, a transition and reward.
-            alive = [e.health > 0 for e in sim.enemies()]
+        # One forward pass for every live enemy of every env, then step the envs one by one.
+        # Envs share no state, so picking all actions before stepping any env is safe.
+        with timed(meter, "act"):
+            alive_per_env, batch_states, batch_ids = [], [], []
+            for env_i, sim in enumerate(envs):
+                states = env_states[env_i]
+                n      = len(sim.enemies())
+                while len(env_rewards[env_i]) < n:
+                    env_rewards[env_i].append(0.0)
+                while len(states) < n:
+                    states.append(np.zeros(30, dtype=np.float32))
+                # Dead enemies stay in the list (zero state, -5, done=True every step) until the episode
+                # ends; only enemies alive before this step get an action, a transition and reward.
+                alive = [e.health > 0 for e in sim.enemies()]
+                alive_per_env.append(alive)
+                for i, e in enumerate(sim.enemies()):
+                    if alive[i]:
+                        batch_states.append(states[i])
+                        batch_ids.append(e.enemy_id)
+            picks = iter(enemy_agent.select_actions(batch_states, batch_ids))
+            actions_per_env = [[next(picks) if a else (0, 0.5) for a in alive] for alive in alive_per_env]
+            meter.counts["actions"] += len(batch_ids)
 
-            with timed(meter, "act"):
-                actions = []
-                for i in range(n):
-                    if i < len(states) and alive[i]:
-                        action, lead_scale = enemy_agent.select_action(
-                            states[i], enemy_id=sim.enemies()[i].enemy_id
-                        )
-                        actions.append((action, lead_scale))
-                        meter.counts["actions"] += 1
-                    else:
-                        actions.append((0, 0.5))
+        for env_i, sim in enumerate(envs):
+            states  = env_states[env_i]
+            n       = len(sim.enemies())
+            alive   = alive_per_env[env_i]
+            actions = actions_per_env[env_i]
 
             with timed(meter, "sim"):
                 next_states, rewards, dones, info = sim.step(actions, dt=sim_dt)
@@ -458,20 +464,23 @@ def train_multi(enemy_agent, profiles, meter):
     try:
         while episode < n_episodes and not time_up(meter):
             with timed(meter, "act"):
+                # one forward pass for every live enemy across all workers' envs
+                batch_states, batch_ids = [], []
+                for w in range(n_workers):
+                    for env_i in range(len(env_splits[w])):
+                        alive = worker_alive[w][env_i]
+                        for j, state in enumerate(worker_states[w][env_i]):
+                            if j < len(alive) and alive[j]:
+                                batch_states.append(state)
+                                batch_ids.append(worker_enemy_ids[w][env_i][j])
+                picks = iter(enemy_agent.select_actions(batch_states, batch_ids))
+                meter.counts["actions"] += len(batch_ids)
                 for w in range(n_workers):
                     actions_per_env = []
                     for env_i in range(len(env_splits[w])):
-                        env_states  = worker_states[w][env_i]
-                        enemy_ids   = worker_enemy_ids[w][env_i]
                         alive       = worker_alive[w][env_i]
-                        env_actions = []
-                        for j, state in enumerate(env_states):
-                            if j < len(alive) and alive[j]:
-                                eid = enemy_ids[j]
-                                env_actions.append(enemy_agent.select_action(state, enemy_id=eid))
-                                meter.counts["actions"] += 1
-                            else:
-                                env_actions.append((0, 0.5))
+                        env_actions = [next(picks) if j < len(alive) and alive[j] else (0, 0.5)
+                                       for j in range(len(worker_states[w][env_i]))]
                         while len(env_actions) < n_enemies:
                             env_actions.append((0, 0.5))
                         actions_per_env.append(env_actions)

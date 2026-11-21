@@ -2,8 +2,8 @@
 # Strong-scaling sweep: fixed 128 envs, vary worker processes. Called by the sbatch files.
 #   bench.sh <device> <out_root>
 # Two phases per worker count:
-#   simonly  - learning disabled, epsilon held at $EPS (default 0.15 = the training floor,
-#              so ~85% of actions run the network) -> rollout (sim + inference) throughput
+#   simonly  - learning disabled, epsilon held at $EPS (default 0.15 = the training floor)
+#              -> rollout (sim + inference) throughput
 #   full     - real training (sim + inference + learner) -> end-to-end throughput
 #              (epsilon decays from 1.0 as in a fresh run, so most actions are still random)
 # Every run passes --episodes 1e9 so its time limit ends it, not ai.train's default of 1000 episodes.

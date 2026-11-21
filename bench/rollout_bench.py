@@ -3,11 +3,12 @@ rollout_bench.py  -  rollout throughput sweep (sim + inference, learning off)
 -----------------------------------------------------------------------------
     python bench/rollout_bench.py                           # envs 1 2 4 8 16, one worker each, 3 x 30 s
     python bench/rollout_bench.py --envs 128 --workers 31   # the training config
-    python bench/rollout_bench.py --epsilon 1.0             # random actions only: no inference
+    python bench/rollout_bench.py --epsilon 1.0             # random actions (inference still runs)
 
 Each run is `python -m ai.train --fresh` with learning off and epsilon held at --epsilon.
-At the 0.15 training floor ~85% of actions go through the network, as they do for most of
-a real training run; --fresh alone starts at 1.0, where select_action skips the network.
+0.15 is the training floor, where real training spends most of its time. Training runs one
+batched forward pass for every live enemy each step whatever epsilon is, so epsilon changes
+which actions are taken, not how much inference runs.
 Throughput = env-steps after the first --warmup seconds, from the run's metrics.jsonl.
 Repeats are interleaved (every N once, then again) so background load hits all N alike.
 The report is appended to --out; run dirs go to <dir of --out>/rollout/<tag>/n<N>_r<r>.

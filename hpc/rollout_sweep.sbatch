@@ -2,7 +2,7 @@
 # GPU node: rollout throughput (sim + inference, learning off) with epsilon held at the
 # training floor: 1..31 envs with one worker each, then the training config (128 envs, 31 workers).
 #   sbatch hpc/rollout_sweep.sbatch
-#   EPS=1.0 sbatch hpc/rollout_sweep.sbatch    # random actions only (no inference), like --fresh
+#   EPS=1.0 sbatch hpc/rollout_sweep.sbatch    # random actions (inference still runs every step)
 #SBATCH --job-name=dqn-rollout
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
