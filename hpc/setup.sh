@@ -10,6 +10,9 @@ cd "$(dirname "$0")/.."
 FLAVOR=${1:-cuda}
 
 command -v uv >/dev/null || { echo "needs uv: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2; exit 1; }
+# Cluster home quotas are small (torch's CUDA wheels are a few GB), so uv's download cache goes
+# next to the venv unless UV_CACHE_DIR says otherwise.
+export UV_CACHE_DIR=${UV_CACHE_DIR:-$PWD/.uv-cache}
 uv venv --allow-existing --python 3.12 venv   # keeps a venv that queued jobs may be using
 PIP="uv pip install --python venv/bin/python"
 case "$FLAVOR" in
